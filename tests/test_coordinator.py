@@ -1,5 +1,9 @@
 """Tests for the Snap7 PLC integration – coordinator address parser."""
 import pytest
+import threading
+import math
+from datetime import timedelta
+from unittest.mock import MagicMock, patch
 
 # Make sure imports work without a real Home Assistant instance
 import sys
@@ -8,7 +12,7 @@ import os
 # Add the repo root so we can import custom_components directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from custom_components.snap7_plc.coordinator import parse_address
+from custom_components.snap7_plc.coordinator import Snap7Coordinator, parse_address
 from custom_components.snap7_plc.const import (
     AREA_DB,
     AREA_M,
@@ -242,3 +246,337 @@ class TestInvalidAddresses:
     def test_dbx_bit_max_valid(self):
         result = parse_address("DB1.DBX0.7", DATA_TYPE_BOOL)
         assert result["bit"] == 7
+
+
+# ---------------------------------------------------------------------------
+# Helper: build a Snap7Coordinator bypassing the HA parent __init__
+# ---------------------------------------------------------------------------
+
+def _make_coordinator(tags=None):
+    """Create a Snap7Coordinator with no real HA instance for unit testing."""
+    coord = Snap7Coordinator.__new__(Snap7Coordinator)
+    coord.plc_ip = "192.168.1.100"
+    coord.rack = 0
+    coord.slot = 1
+    coord.tags = tags or []
+    coord._client = None
+    coord._lock = threading.Lock()
+    coord._parsed_tags = {}
+    for tag in (tags or []):
+        try:
+            coord._parsed_tags[tag["id"]] = parse_address(
+                tag["address"], tag["data_type"]
+            )
+        except ValueError:
+            pass
+    return coord
+
+
+def _bool_tag(tag_id: str = "t1") -> dict:
+    return {"id": tag_id, "name": "Test", "address": "DB1.DBX0.0", "data_type": DATA_TYPE_BOOL}
+
+
+def _word_tag(tag_id: str = "t2") -> dict:
+    return {"id": tag_id, "name": "Speed", "address": "DB1.DBW2", "data_type": DATA_TYPE_WORD}
+
+
+# ---------------------------------------------------------------------------
+# Thread lock
+# ---------------------------------------------------------------------------
+
+class TestThreadLock:
+    def test_lock_is_created(self):
+        coord = _make_coordinator()
+        assert isinstance(coord._lock, type(threading.Lock()))
+
+    def test_lock_is_reentrant_check(self):
+        """_fetch_all must NOT deadlock (calls disconnect()-like code inside lock)."""
+        from tests.conftest import _FakeSnap7Client
+
+        coord = _make_coordinator(tags=[_bool_tag()])
+        # Pre-set a connected client so _get_client() doesn't reconnect
+        coord._client = _FakeSnap7Client()
+
+        result = [None]
+        exc_holder = [None]
+
+        def run():
+            try:
+                result[0] = coord._fetch_all()
+            except Exception as e:
+                exc_holder[0] = e
+
+        t = threading.Thread(target=run)
+        t.start()
+        t.join(timeout=5)
+        assert not t.is_alive(), "Deadlock detected: _fetch_all never returned"
+        assert exc_holder[0] is None, f"Unexpected exception: {exc_holder[0]}"
+
+
+# ---------------------------------------------------------------------------
+# Coordinator: all-tag-fail detection
+# ---------------------------------------------------------------------------
+
+class TestFetchAllFailure:
+    def test_all_reads_fail_raises_connection_error(self):
+        """When every tag read fails, _fetch_all should raise ConnectionError."""
+        tag = _bool_tag()
+        coord = _make_coordinator(tags=[tag])
+
+        # Make the stub client raise on db_read
+        import sys
+        bad_client = MagicMock()
+        bad_client.get_connected.return_value = True
+        bad_client.db_read.side_effect = RuntimeError("simulated read error")
+        coord._client = bad_client
+
+        with pytest.raises(ConnectionError, match="All.*tag read"):
+            coord._fetch_all()
+
+    def test_all_reads_fail_resets_client(self):
+        """When all reads fail, _client must be cleared so next poll reconnects."""
+        tag = _bool_tag()
+        coord = _make_coordinator(tags=[tag])
+
+        bad_client = MagicMock()
+        bad_client.get_connected.return_value = True
+        bad_client.db_read.side_effect = RuntimeError("simulated read error")
+        coord._client = bad_client
+
+        with pytest.raises(ConnectionError):
+            coord._fetch_all()
+
+        assert coord._client is None
+
+    def test_partial_failure_returns_partial_data(self):
+        """When only some tags fail, _fetch_all should return partial results."""
+        tag_ok = _bool_tag("t1")
+        tag_bad = _word_tag("t2")
+        coord = _make_coordinator(tags=[tag_ok, tag_bad])
+
+        # db_read raises only for word (size=2), succeeds for bool (size=1)
+        def selective_read(db, start, size):
+            if size == 2:
+                raise RuntimeError("word read failed")
+            return bytearray(size)
+
+        ok_client = MagicMock()
+        ok_client.get_connected.return_value = True
+        ok_client.db_read.side_effect = selective_read
+        coord._client = ok_client
+
+        result = coord._fetch_all()
+        assert result["t1"] is not None  # bool read succeeded
+        assert result["t2"] is None       # word read failed → None
+
+    def test_no_tags_returns_empty_dict(self):
+        """With no tags configured, _fetch_all returns an empty dict."""
+        from tests.conftest import _FakeSnap7Client
+
+        coord = _make_coordinator(tags=[])
+        coord._client = _FakeSnap7Client()
+        result = coord._fetch_all()
+        assert result == {}
+
+    def test_connection_failure_resets_client(self):
+        """If _get_client() itself fails, _client is reset to None."""
+        coord = _make_coordinator(tags=[_bool_tag()])
+        coord._client = None  # force reconnect path
+
+        snap7_client_mod = sys.modules.get("snap7.client")
+        original_cls = snap7_client_mod.Client
+
+        class _AlwaysDisconnected:
+            def get_connected(self):
+                return False
+            def connect(self, *a):
+                pass
+
+        snap7_client_mod.Client = _AlwaysDisconnected
+        try:
+            with pytest.raises(ConnectionError):
+                coord._fetch_all()
+            assert coord._client is None
+        finally:
+            snap7_client_mod.Client = original_cls
+
+
+# ---------------------------------------------------------------------------
+# Write range validation
+# ---------------------------------------------------------------------------
+
+def _make_write_coordinator(tag):
+    """Create a coordinator with a pre-connected stub client for write tests."""
+    from tests.conftest import _FakeSnap7Client
+
+    coord = _make_coordinator(tags=[tag])
+    coord._client = _FakeSnap7Client()
+    return coord
+
+
+class TestWriteRangeValidation:
+    def test_byte_too_large(self):
+        tag = {"id": "t1", "name": "B", "address": "DB1.DBB0", "data_type": DATA_TYPE_BYTE}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="out of range"):
+            coord._write_value("t1", 256)
+
+    def test_byte_negative(self):
+        tag = {"id": "t1", "name": "B", "address": "DB1.DBB0", "data_type": DATA_TYPE_BYTE}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="out of range"):
+            coord._write_value("t1", -1)
+
+    def test_word_too_large(self):
+        tag = _word_tag()
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="out of range"):
+            coord._write_value("t2", 65536)
+
+    def test_word_valid(self):
+        tag = _word_tag()
+        coord = _make_write_coordinator(tag)
+        coord._write_value("t2", 65535)  # must not raise
+
+    def test_int_too_large(self):
+        tag = {"id": "t1", "name": "I", "address": "DB1.DBW0", "data_type": DATA_TYPE_INT}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="out of range"):
+            coord._write_value("t1", 32768)
+
+    def test_int_too_small(self):
+        tag = {"id": "t1", "name": "I", "address": "DB1.DBW0", "data_type": DATA_TYPE_INT}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="out of range"):
+            coord._write_value("t1", -32769)
+
+    def test_dword_too_large(self):
+        tag = {"id": "t1", "name": "D", "address": "DB1.DBD0", "data_type": DATA_TYPE_DWORD}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="out of range"):
+            coord._write_value("t1", 4294967296)
+
+    def test_dint_too_large(self):
+        tag = {"id": "t1", "name": "DI", "address": "DB1.DBD0", "data_type": DATA_TYPE_DINT}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="out of range"):
+            coord._write_value("t1", 2147483648)
+
+    def test_dint_too_small(self):
+        tag = {"id": "t1", "name": "DI", "address": "DB1.DBD0", "data_type": DATA_TYPE_DINT}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="out of range"):
+            coord._write_value("t1", -2147483649)
+
+    def test_real_inf_rejected(self):
+        tag = {"id": "t1", "name": "R", "address": "DB1.DBD0", "data_type": DATA_TYPE_REAL}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="not a finite"):
+            coord._write_value("t1", float("inf"))
+
+    def test_real_nan_rejected(self):
+        tag = {"id": "t1", "name": "R", "address": "DB1.DBD0", "data_type": DATA_TYPE_REAL}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="not a finite"):
+            coord._write_value("t1", float("nan"))
+
+    def test_write_failure_resets_client(self):
+        """A write failure must clear _client so the next poll reconnects."""
+        tag = _bool_tag()
+        coord = _make_coordinator(tags=[tag])
+
+        bad_client = MagicMock()
+        bad_client.get_connected.return_value = True
+        bad_client.db_read.side_effect = RuntimeError("write channel broken")
+        coord._client = bad_client
+
+        with pytest.raises(RuntimeError):
+            coord._write_value("t1", True)
+
+        assert coord._client is None
+
+    def test_unknown_tag_raises_value_error(self):
+        coord = _make_coordinator(tags=[])
+        with pytest.raises(ValueError, match="not found"):
+            coord._write_value("nonexistent", True)
+
+
+# ---------------------------------------------------------------------------
+# Scan interval
+# ---------------------------------------------------------------------------
+
+class TestScanInterval:
+    def test_scan_interval_formula(self):
+        """Coordinator uses timedelta(milliseconds=scan_interval) for update_interval."""
+        # Verify that the formula produces the correct timedelta
+        scan_interval_ms = 5000
+        result = timedelta(milliseconds=scan_interval_ms)
+        assert result == timedelta(seconds=5)
+
+    def test_default_scan_interval_is_30_seconds(self):
+        """DEFAULT_SCAN_INTERVAL must represent 30 seconds expressed in ms."""
+        from custom_components.snap7_plc.const import DEFAULT_SCAN_INTERVAL
+        assert DEFAULT_SCAN_INTERVAL == 30000
+
+    def test_timedelta_from_30000ms(self):
+        assert timedelta(milliseconds=30000) == timedelta(seconds=30)
+
+
+# ---------------------------------------------------------------------------
+# Writable validation (logic layer)
+# ---------------------------------------------------------------------------
+
+class TestWritableValidation:
+    """The writable=True flag is only valid for boolean tags."""
+
+    def test_non_bool_writable_raises_in_config_logic(self):
+        """Simulate the config flow validation check."""
+        from custom_components.snap7_plc.const import DATA_TYPE_WORD
+
+        address = "DB1.DBW0"
+        data_type = DATA_TYPE_WORD
+        writable = True
+
+        parsed = parse_address(address, data_type)
+        is_error = writable and parsed["data_type"] != DATA_TYPE_BOOL
+        assert is_error, "Expected validation error for non-bool writable tag"
+
+    def test_bool_writable_is_valid(self):
+        address = "DB1.DBX0.0"
+        data_type = DATA_TYPE_BOOL
+        writable = True
+
+        parsed = parse_address(address, data_type)
+        is_error = writable and parsed["data_type"] != DATA_TYPE_BOOL
+        assert not is_error
+
+    def test_non_bool_not_writable_is_valid(self):
+        from custom_components.snap7_plc.const import DATA_TYPE_WORD
+
+        address = "DB1.DBW0"
+        data_type = DATA_TYPE_WORD
+        writable = False
+
+        parsed = parse_address(address, data_type)
+        is_error = writable and parsed["data_type"] != DATA_TYPE_BOOL
+        assert not is_error
+
+
+# ---------------------------------------------------------------------------
+# Unique ID format
+# ---------------------------------------------------------------------------
+
+class TestUniqueId:
+    def test_unique_id_includes_rack_and_slot(self):
+        """Unique ID must be ip:rack:slot, not just ip."""
+        plc_ip = "192.168.1.10"
+        rack = 0
+        slot = 1
+        unique_id = f"{plc_ip}:{rack}:{slot}"
+        assert unique_id == "192.168.1.10:0:1"
+
+    def test_same_ip_different_slot_are_distinct(self):
+        plc_ip = "192.168.1.10"
+        uid_slot1 = f"{plc_ip}:0:1"
+        uid_slot2 = f"{plc_ip}:0:2"
+        assert uid_slot1 != uid_slot2

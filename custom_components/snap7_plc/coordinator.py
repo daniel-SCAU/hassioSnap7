@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
+import threading
 from datetime import timedelta
 from typing import Any
 
@@ -50,9 +52,13 @@ def parse_address(address: str, data_type: str) -> dict:
       - String   : ``DB<n>.DBB<byte>(<length>)``      e.g. ``DB1.DBB0(10)``
 
     For **string** addresses the *length* specifies how many consecutive bytes
-    form the string.  Each byte is interpreted as its ASCII decimal value and
-    the bytes are joined into a single string.  Null bytes (0x00) at the end
-    are stripped automatically.
+    form the raw ASCII byte array.  Each byte is interpreted as its ASCII
+    decimal value and the bytes are joined into a single string.  Null bytes
+    (0x00) at the end are stripped automatically.
+
+    Note: this is **not** the Siemens S7 STRING format (which uses a 2-byte
+    header of max-length and actual-length before the character data).  Use
+    this type for raw byte arrays that happen to contain printable ASCII text.
 
     The *data_type* argument refines interpretation when the address prefix
     is ambiguous (e.g. ``DBW`` can be ``word`` or ``int``).
@@ -222,6 +228,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
         self.slot = slot
         self.tags = tags
         self._client: Any = None
+        self._lock = threading.Lock()
 
         # Pre-parse all tag addresses once at startup
         self._parsed_tags: dict[str, dict] = {}
@@ -259,13 +266,14 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
     def disconnect(self) -> None:
         """Gracefully disconnect from the PLC."""
-        if self._client is not None:
-            try:
-                if self._client.get_connected():
-                    self._client.disconnect()
-            except Exception:  # noqa: BLE001
-                pass
-            self._client = None
+        with self._lock:
+            if self._client is not None:
+                try:
+                    if self._client.get_connected():
+                        self._client.disconnect()
+                except Exception:  # noqa: BLE001
+                    pass
+                self._client = None
 
     # ── read / write helpers (blocking – run in executor) ──────────────────
 
@@ -342,39 +350,69 @@ class Snap7Coordinator(DataUpdateCoordinator):
             raise ValueError(f"Tag '{tag_id}' not found in coordinator")
 
         parsed = self._parsed_tags[tag_id]
-        client = self._get_client()
-        area = parsed["area"]
-        db = parsed["db"]
-        byte = parsed["byte"]
-        bit = parsed["bit"]
-        data_type = parsed["data_type"]
-        size = _data_size(data_type)
 
-        # Read-modify-write (required for bit operations)
-        if area == AREA_DB:
-            raw = client.db_read(db, byte, size)
-        else:
-            raw = client.read_area(Areas.MK, 0, byte, size)
+        with self._lock:
+            try:
+                client = self._get_client()
+                area = parsed["area"]
+                db = parsed["db"]
+                byte = parsed["byte"]
+                bit = parsed["bit"]
+                data_type = parsed["data_type"]
+                size = _data_size(data_type)
 
-        if data_type == DATA_TYPE_BOOL:
-            set_bool(raw, 0, bit, bool(value))
-        elif data_type == DATA_TYPE_BYTE:
-            raw[0] = int(value) & 0xFF
-        elif data_type == DATA_TYPE_WORD:
-            set_word(raw, 0, int(value))
-        elif data_type == DATA_TYPE_INT:
-            set_int(raw, 0, int(value))
-        elif data_type == DATA_TYPE_DWORD:
-            set_dword(raw, 0, int(value))
-        elif data_type == DATA_TYPE_DINT:
-            set_dint(raw, 0, int(value))
-        elif data_type == DATA_TYPE_REAL:
-            set_real(raw, 0, float(value))
+                # Read-modify-write (required for bit operations)
+                if area == AREA_DB:
+                    raw = client.db_read(db, byte, size)
+                else:
+                    raw = client.read_area(Areas.MK, 0, byte, size)
 
-        if area == AREA_DB:
-            client.db_write(db, byte, raw)
-        else:
-            client.write_area(Areas.MK, 0, byte, raw)
+                if data_type == DATA_TYPE_BOOL:
+                    set_bool(raw, 0, bit, bool(value))
+                elif data_type == DATA_TYPE_BYTE:
+                    v = int(value)
+                    if not 0 <= v <= 255:
+                        raise ValueError(f"Byte value {v} is out of range 0–255")
+                    raw[0] = v
+                elif data_type == DATA_TYPE_WORD:
+                    v = int(value)
+                    if not 0 <= v <= 65535:
+                        raise ValueError(f"Word value {v} is out of range 0–65535")
+                    set_word(raw, 0, v)
+                elif data_type == DATA_TYPE_INT:
+                    v = int(value)
+                    if not -32768 <= v <= 32767:
+                        raise ValueError(f"Int value {v} is out of range -32768–32767")
+                    set_int(raw, 0, v)
+                elif data_type == DATA_TYPE_DWORD:
+                    v = int(value)
+                    if not 0 <= v <= 4294967295:
+                        raise ValueError(
+                            f"DWord value {v} is out of range 0–4294967295"
+                        )
+                    set_dword(raw, 0, v)
+                elif data_type == DATA_TYPE_DINT:
+                    v = int(value)
+                    if not -2147483648 <= v <= 2147483647:
+                        raise ValueError(
+                            f"DInt value {v} is out of range -2147483648–2147483647"
+                        )
+                    set_dint(raw, 0, v)
+                elif data_type == DATA_TYPE_REAL:
+                    f = float(value)
+                    if not math.isfinite(f):
+                        raise ValueError(
+                            f"Real value {f!r} is not a finite number"
+                        )
+                    set_real(raw, 0, f)
+
+                if area == AREA_DB:
+                    client.db_write(db, byte, raw)
+                else:
+                    client.write_area(Areas.MK, 0, byte, raw)
+            except Exception:
+                self._client = None
+                raise
 
     # ── async wrappers ──────────────────────────────────────────────────────
 
@@ -387,30 +425,41 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
     def _fetch_all(self) -> dict:
         """Read all tags from the PLC (blocking, runs in executor)."""
-        # Ensure the client connects (raises on failure – caught by caller)
-        try:
-            self._get_client()
-        except Exception:
-            self._client = None
-            raise
-
-        result: dict[str, Any] = {}
-        for tag in self.tags:
-            tag_id = tag["id"]
-            if tag_id not in self._parsed_tags:
-                result[tag_id] = None
-                continue
+        with self._lock:
+            # Ensure the client connects (raises on failure – caught by caller)
             try:
-                result[tag_id] = self._read_value(self._parsed_tags[tag_id])
-            except Exception as exc:  # noqa: BLE001
-                _LOGGER.warning(
-                    "Error reading tag '%s' (%s): %s",
-                    tag.get("name"),
-                    tag.get("address"),
-                    exc,
+                self._get_client()
+            except Exception:
+                self._client = None
+                raise
+
+            result: dict[str, Any] = {}
+            failed = 0
+            for tag in self.tags:
+                tag_id = tag["id"]
+                if tag_id not in self._parsed_tags:
+                    result[tag_id] = None
+                    continue
+                try:
+                    result[tag_id] = self._read_value(self._parsed_tags[tag_id])
+                except Exception as exc:  # noqa: BLE001
+                    _LOGGER.warning(
+                        "Error reading tag '%s' (%s): %s",
+                        tag.get("name"),
+                        tag.get("address"),
+                        exc,
+                    )
+                    result[tag_id] = None
+                    failed += 1
+
+            if self.tags and failed == len(self.tags):
+                self._client = None
+                raise ConnectionError(
+                    f"All {failed} PLC tag read(s) failed for {self.plc_ip} – "
+                    "disconnecting client"
                 )
-                result[tag_id] = None
-        return result
+
+            return result
 
     async def _async_update_data(self) -> dict:
         """Fetch all PLC tags. Called by the DataUpdateCoordinator."""

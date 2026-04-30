@@ -16,6 +16,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     CONF_SLOT,
     CONF_TAGS,
+    DATA_TYPE_BOOL,
     DATA_TYPES,
     DEFAULT_RACK,
     DEFAULT_SCAN_INTERVAL,
@@ -29,40 +30,31 @@ _S7_PORT = 102  # Standard Siemens S7 TCP port
 _NETWORK_TIMEOUT = 3  # seconds
 
 
-def _diagnose_connection(plc_ip: str, rack: int, slot: int) -> str | None:
-    """Run three-step diagnostics and return an error key, or *None* on success.
+def _validate_connection_config(plc_ip: str, rack: int, slot: int) -> str | None:
+    """Validate config entry inputs; return an error key or *None* on success.
 
     Steps
     -----
     1. Verify that the ``snap7`` library can be imported (checks installation).
-    2. Open a raw TCP socket to port 102 to verify basic network reachability.
-    3. Use the snap7 client to connect and confirm the PLC responds.
+    2. Validate that *plc_ip* is a syntactically valid IP address.
+
+    The actual TCP/PLC connection is intentionally **not** tested here so that
+    the entry can be created even when the PLC is temporarily offline.  The
+    coordinator will retry the connection via ``ConfigEntryNotReady``.
     """
-    import socket
+    import ipaddress
 
     # ── Step 1: library available? ──────────────────────────────────────────
     try:
-        import snap7 as _snap7
+        import snap7 as _snap7  # noqa: F401
     except ImportError:
         return "snap7_not_installed"
 
-    # ── Step 2: network reachable? ──────────────────────────────────────────
+    # ── Step 2: valid IP address format? ────────────────────────────────────
     try:
-        with socket.create_connection((plc_ip, _S7_PORT), timeout=_NETWORK_TIMEOUT):
-            pass
-    except OSError:
-        return "network_unreachable"
-
-    # ── Step 3: PLC responding to S7 handshake? ─────────────────────────────
-    try:
-        client = _snap7.client.Client()
-        client.connect(plc_ip, rack, slot)
-        connected = client.get_connected()
-        client.disconnect()
-        if not connected:
-            return "cannot_connect"
-    except Exception:  # noqa: BLE001
-        return "cannot_connect"
+        ipaddress.ip_address(plc_ip)
+    except ValueError:
+        return "invalid_ip"
 
     return None
 
@@ -84,7 +76,7 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             error_key = await self.hass.async_add_executor_job(
-                _diagnose_connection,
+                _validate_connection_config,
                 user_input[CONF_PLC_IP],
                 user_input[CONF_RACK],
                 user_input[CONF_SLOT],
@@ -92,10 +84,13 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if error_key:
                 errors["base"] = error_key
             else:
-                await self.async_set_unique_id(user_input[CONF_PLC_IP])
+                plc_ip = user_input[CONF_PLC_IP]
+                rack = user_input[CONF_RACK]
+                slot = user_input[CONF_SLOT]
+                await self.async_set_unique_id(f"{plc_ip}:{rack}:{slot}")
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
-                    title=f"PLC {user_input[CONF_PLC_IP]}",
+                    title=f"PLC {plc_ip}",
                     data=user_input,
                 )
 
@@ -123,7 +118,7 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             error_key = await self.hass.async_add_executor_job(
-                _diagnose_connection,
+                _validate_connection_config,
                 user_input[CONF_PLC_IP],
                 user_input[CONF_RACK],
                 user_input[CONF_SLOT],
@@ -131,7 +126,10 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if error_key:
                 errors["base"] = error_key
             else:
-                await self.async_set_unique_id(user_input[CONF_PLC_IP])
+                plc_ip = user_input[CONF_PLC_IP]
+                rack = user_input[CONF_RACK]
+                slot = user_input[CONF_SLOT]
+                await self.async_set_unique_id(f"{plc_ip}:{rack}:{slot}")
                 self._abort_if_unique_id_configured(
                     updates=user_input, reload_on_update=False
                 )
@@ -214,16 +212,19 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             except ValueError:
                 errors["address"] = "invalid_address"
             else:
-                tag: dict[str, Any] = {
-                    "id": str(uuid.uuid4()),
-                    "name": user_input["name"].strip(),
-                    "address": address,
-                    "data_type": parsed["data_type"],
-                    "unit": user_input.get("unit", ""),
-                    "writable": user_input.get("writable", False),
-                }
-                self._tags.append(tag)
-                return await self.async_step_menu()
+                if user_input.get("writable") and parsed["data_type"] != DATA_TYPE_BOOL:
+                    errors["writable"] = "only_bool_writable"
+                else:
+                    tag: dict[str, Any] = {
+                        "id": str(uuid.uuid4()),
+                        "name": user_input["name"].strip(),
+                        "address": address,
+                        "data_type": parsed["data_type"],
+                        "unit": user_input.get("unit", ""),
+                        "writable": user_input.get("writable", False),
+                    }
+                    self._tags.append(tag)
+                    return await self.async_step_menu()
 
         schema = vol.Schema(
             {

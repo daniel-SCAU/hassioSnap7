@@ -67,3 +67,69 @@ ha_coord.UpdateFailed = _UpdateFailed  # type: ignore[attr-defined]
 
 ha_entity = sys.modules["homeassistant.helpers.entity"]
 ha_entity.DeviceInfo = dict  # type: ignore[attr-defined]
+
+# ---------------------------------------------------------------------------
+# snap7 stubs – replaced per-test with unittest.mock when behaviour matters
+# ---------------------------------------------------------------------------
+
+_make_stub("snap7", "snap7.client", "snap7.util", "snap7.types")
+
+snap7_mod = sys.modules["snap7"]
+snap7_client_mod = sys.modules["snap7.client"]
+snap7_util_mod = sys.modules["snap7.util"]
+snap7_types_mod = sys.modules["snap7.types"]
+
+
+class _FakeSnap7Client:
+    """Minimal snap7 client stub – all reads succeed and return a zero byte."""
+
+    def get_connected(self) -> bool:
+        return True
+
+    def connect(self, *args) -> None:
+        pass
+
+    def disconnect(self) -> None:
+        pass
+
+    def db_read(self, db: int, start: int, size: int):
+        return bytearray(size)
+
+    def db_write(self, db: int, start: int, data) -> None:
+        pass
+
+    def read_area(self, area, db: int, start: int, size: int):
+        return bytearray(size)
+
+    def write_area(self, area, db: int, start: int, data) -> None:
+        pass
+
+
+snap7_client_mod.Client = _FakeSnap7Client  # type: ignore[attr-defined]
+# Expose the sub-module as an attribute (mirrors real import behaviour)
+snap7_mod.client = snap7_client_mod  # type: ignore[attr-defined]
+
+
+# Stub the utility functions used by the coordinator
+def _noop_set(*args, **kwargs):
+    pass
+
+
+def _noop_get(*_args, **_kwargs):
+    return 0
+
+
+snap7_util_mod.get_bool = lambda buf, byte, bit: False  # type: ignore[attr-defined]
+snap7_util_mod.get_int = _noop_get  # type: ignore[attr-defined]
+snap7_util_mod.get_word = _noop_get  # type: ignore[attr-defined]
+snap7_util_mod.get_dint = _noop_get  # type: ignore[attr-defined]
+snap7_util_mod.get_dword = _noop_get  # type: ignore[attr-defined]
+snap7_util_mod.get_real = _noop_get  # type: ignore[attr-defined]
+snap7_util_mod.set_bool = _noop_set  # type: ignore[attr-defined]
+snap7_util_mod.set_int = _noop_set  # type: ignore[attr-defined]
+snap7_util_mod.set_word = _noop_set  # type: ignore[attr-defined]
+snap7_util_mod.set_dint = _noop_set  # type: ignore[attr-defined]
+snap7_util_mod.set_dword = _noop_set  # type: ignore[attr-defined]
+snap7_util_mod.set_real = _noop_set  # type: ignore[attr-defined]
+
+snap7_types_mod.Areas = types.SimpleNamespace(MK=0x83)  # type: ignore[attr-defined]
