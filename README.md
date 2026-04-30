@@ -69,10 +69,12 @@ Open the integration's **Configure** dialog (Settings → Devices & Services →
 | Merker byte | `MB<byte>` | `MB10` | 8-bit unsigned |
 | Merker word/int | `MW<byte>` | `MW20` | 16-bit; choose `word` (unsigned) or `int` (signed) |
 | Merker dword/dint/real | `MD<byte>` | `MD100` | 32-bit; choose `dword`, `dint`, or `real` |
+| Merker string | `MB<byte>(<length>)` | `MB140(4)` | Reads *length* consecutive bytes; each byte decoded as ASCII |
 | DB boolean | `DB<n>.DBX<byte>.<bit>` | `DB1.DBX0.0` | |
 | DB byte | `DB<n>.DBB<byte>` | `DB1.DBB2` | |
 | DB word/int | `DB<n>.DBW<byte>` | `DB1.DBW4` | |
 | DB dword/dint/real | `DB<n>.DBD<byte>` | `DB1.DBD8` | |
+| DB string | `DB<n>.DBB<byte>(<length>)` | `DB1.DBB0(10)` | Reads *length* consecutive bytes; each byte decoded as ASCII |
 
 ---
 

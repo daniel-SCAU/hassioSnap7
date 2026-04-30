@@ -43,7 +43,7 @@
       },
       "add_tag": {
         "title": "Add PLC Tag",
-        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`",
+        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`\n- String (N bytes, ASCII): `MB140(4)` or `DB1.DBB0(10)`",
         "data": {
           "name": "Tag Name",
           "address": "PLC Address",

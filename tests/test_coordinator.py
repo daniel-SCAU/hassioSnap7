@@ -18,6 +18,7 @@ from custom_components.snap7_plc.const import (
     DATA_TYPE_DWORD,
     DATA_TYPE_INT,
     DATA_TYPE_REAL,
+    DATA_TYPE_STRING,
     DATA_TYPE_WORD,
 )
 
@@ -150,6 +151,58 @@ class TestDBAreaDWord:
     def test_dbd_real(self):
         result = parse_address("DB1.DBD8", DATA_TYPE_REAL)
         assert result["data_type"] == DATA_TYPE_REAL
+
+
+# ---------------------------------------------------------------------------
+# String tags
+# ---------------------------------------------------------------------------
+
+class TestMAreaString:
+    def test_basic_string(self):
+        result = parse_address("MB140(4)", DATA_TYPE_STRING)
+        assert result["area"] == AREA_M
+        assert result["byte"] == 140
+        assert result["data_type"] == DATA_TYPE_STRING
+        assert result["string_length"] == 4
+
+    def test_string_length_1(self):
+        result = parse_address("MB0(1)", DATA_TYPE_STRING)
+        assert result["string_length"] == 1
+
+    def test_string_larger_length(self):
+        result = parse_address("MB200(20)", DATA_TYPE_STRING)
+        assert result["byte"] == 200
+        assert result["string_length"] == 20
+
+    def test_case_insensitive(self):
+        result = parse_address("mb140(4)", DATA_TYPE_STRING)
+        assert result["area"] == AREA_M
+        assert result["string_length"] == 4
+
+    def test_data_type_forced_to_string(self):
+        # data_type argument is ignored for string addresses
+        result = parse_address("MB140(4)", DATA_TYPE_BOOL)
+        assert result["data_type"] == DATA_TYPE_STRING
+
+
+class TestDBAreaString:
+    def test_basic_string(self):
+        result = parse_address("DB1.DBB0(10)", DATA_TYPE_STRING)
+        assert result["area"] == AREA_DB
+        assert result["db"] == 1
+        assert result["byte"] == 0
+        assert result["data_type"] == DATA_TYPE_STRING
+        assert result["string_length"] == 10
+
+    def test_string_higher_db_and_byte(self):
+        result = parse_address("DB5.DBB20(8)", DATA_TYPE_STRING)
+        assert result["db"] == 5
+        assert result["byte"] == 20
+        assert result["string_length"] == 8
+
+    def test_data_type_forced_to_string(self):
+        result = parse_address("DB1.DBB0(4)", DATA_TYPE_BOOL)
+        assert result["data_type"] == DATA_TYPE_STRING
 
 
 # ---------------------------------------------------------------------------

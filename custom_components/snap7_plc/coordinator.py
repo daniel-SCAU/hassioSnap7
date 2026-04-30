@@ -18,6 +18,7 @@ from .const import (
     DATA_TYPE_DWORD,
     DATA_TYPE_INT,
     DATA_TYPE_REAL,
+    DATA_TYPE_STRING,
     DATA_TYPE_WORD,
     DOMAIN,
 )
@@ -35,16 +36,23 @@ def parse_address(address: str, data_type: str) -> dict:
     Supported address formats
     -------------------------
     M area (Merker):
-      - Boolean  : ``M<byte>.<bit>``   e.g. ``M0.0``
-      - Byte     : ``MB<byte>``         e.g. ``MB10``
-      - Word/Int : ``MW<byte>``         e.g. ``MW20``
-      - DWord …  : ``MD<byte>``         e.g. ``MD100``
+      - Boolean  : ``M<byte>.<bit>``        e.g. ``M0.0``
+      - Byte     : ``MB<byte>``              e.g. ``MB10``
+      - Word/Int : ``MW<byte>``              e.g. ``MW20``
+      - DWord …  : ``MD<byte>``              e.g. ``MD100``
+      - String   : ``MB<byte>(<length>)``    e.g. ``MB140(4)``
 
     DB area (Data Block):
-      - Boolean  : ``DB<n>.DBX<byte>.<bit>``  e.g. ``DB1.DBX0.0``
-      - Byte     : ``DB<n>.DBB<byte>``         e.g. ``DB1.DBB2``
-      - Word/Int : ``DB<n>.DBW<byte>``         e.g. ``DB1.DBW4``
-      - DWord …  : ``DB<n>.DBD<byte>``         e.g. ``DB1.DBD8``
+      - Boolean  : ``DB<n>.DBX<byte>.<bit>``         e.g. ``DB1.DBX0.0``
+      - Byte     : ``DB<n>.DBB<byte>``                e.g. ``DB1.DBB2``
+      - Word/Int : ``DB<n>.DBW<byte>``                e.g. ``DB1.DBW4``
+      - DWord …  : ``DB<n>.DBD<byte>``                e.g. ``DB1.DBD8``
+      - String   : ``DB<n>.DBB<byte>(<length>)``      e.g. ``DB1.DBB0(10)``
+
+    For **string** addresses the *length* specifies how many consecutive bytes
+    form the string.  Each byte is interpreted as its ASCII decimal value and
+    the bytes are joined into a single string.  Null bytes (0x00) at the end
+    are stripped automatically.
 
     The *data_type* argument refines interpretation when the address prefix
     is ambiguous (e.g. ``DBW`` can be ``word`` or ``int``).
@@ -60,6 +68,20 @@ def parse_address(address: str, data_type: str) -> dict:
             "byte": int(m.group(2)),
             "bit": int(m.group(3)),
             "data_type": DATA_TYPE_BOOL,
+        }
+
+    m = re.match(r"^DB(\d+)\.DBB(\d+)\((\d+)\)$", addr)
+    if m:
+        length = int(m.group(3))
+        if length < 1:
+            raise ValueError(f"String length must be at least 1, got {length!r}")
+        return {
+            "area": AREA_DB,
+            "db": int(m.group(1)),
+            "byte": int(m.group(2)),
+            "bit": 0,
+            "data_type": DATA_TYPE_STRING,
+            "string_length": length,
         }
 
     m = re.match(r"^DB(\d+)\.DBB(\d+)$", addr)
@@ -103,6 +125,20 @@ def parse_address(address: str, data_type: str) -> dict:
             "byte": int(m.group(1)),
             "bit": int(m.group(2)),
             "data_type": DATA_TYPE_BOOL,
+        }
+
+    m = re.match(r"^MB(\d+)\((\d+)\)$", addr)
+    if m:
+        length = int(m.group(2))
+        if length < 1:
+            raise ValueError(f"String length must be at least 1, got {length!r}")
+        return {
+            "area": AREA_M,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": 0,
+            "data_type": DATA_TYPE_STRING,
+            "string_length": length,
         }
 
     m = re.match(r"^MB(\d+)$", addr)
@@ -237,6 +273,21 @@ class Snap7Coordinator(DataUpdateCoordinator):
         byte = parsed["byte"]
         bit = parsed["bit"]
         data_type = parsed["data_type"]
+
+        # ── String: read N bytes and decode as ASCII ────────────────────────
+        if data_type == DATA_TYPE_STRING:
+            length = parsed["string_length"]
+            if area == AREA_DB:
+                raw = client.db_read(db, byte, length)
+            else:
+                raw = client.read_area(Areas.MK, 0, byte, length)
+            _ASCII_PRINTABLE_MIN = 32
+            _ASCII_PRINTABLE_MAX = 126
+            return "".join(
+                chr(b) if _ASCII_PRINTABLE_MIN <= b <= _ASCII_PRINTABLE_MAX else ""
+                for b in raw
+            ).rstrip("\x00")
+
         size = _data_size(data_type)
 
         if area == AREA_DB:
