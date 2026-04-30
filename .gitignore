@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# pytest
+.pytest_cache/
+.cache/
+
+# HA development
+.storage/
+.HA_VERSION
+
+# editors
+.vscode/
+.idea/
+*.swp
+*.swo
