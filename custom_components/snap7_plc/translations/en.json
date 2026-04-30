@@ -23,7 +23,9 @@
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to the PLC. Verify the IP address, rack, and slot are correct and that the PLC is accessible."
+      "snap7_not_installed": "The python-snap7 library is not installed. Restart Home Assistant and try again — it should be installed automatically. If the problem persists, check your Home Assistant logs for pip errors.",
+      "network_unreachable": "The PLC IP address is not reachable on the network (TCP port 102 timed out). Check that the IP address is correct, the PLC is powered on, and the network cable / firewall allows S7 traffic.",
+      "cannot_connect": "The host is reachable but the PLC did not accept the S7 connection. Verify that the Rack and Slot numbers are correct, that the PLC has PUT/GET access enabled, and that no firewall is blocking port 102."
     },
     "abort": {
       "already_configured": "This PLC IP address is already configured.",
