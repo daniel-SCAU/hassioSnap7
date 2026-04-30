@@ -249,6 +249,11 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
         if not self._client.get_connected():
             self._client.connect(self.plc_ip, self.rack, self.slot)
+            if not self._client.get_connected():
+                raise ConnectionError(
+                    f"Failed to connect to PLC at {self.plc_ip} "
+                    f"(rack={self.rack}, slot={self.slot})"
+                )
 
         return self._client
 

@@ -31,6 +31,10 @@ def _try_connect(plc_ip: str, rack: int, slot: int) -> None:
 
     client = snap7.client.Client()
     client.connect(plc_ip, rack, slot)
+    if not client.get_connected():
+        raise ConnectionError(
+            f"Failed to connect to PLC at {plc_ip} (rack={rack}, slot={slot})"
+        )
     client.disconnect()
 
 
