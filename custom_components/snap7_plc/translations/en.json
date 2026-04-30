@@ -8,7 +8,7 @@
           "plc_ip": "PLC IP Address",
           "rack": "Rack Number",
           "slot": "Slot Number",
-          "scan_interval": "Scan Interval (seconds)"
+          "scan_interval": "Scan Interval (ms)"
         }
       },
       "reconfigure": {
@@ -18,7 +18,7 @@
           "plc_ip": "PLC IP Address",
           "rack": "Rack Number",
           "slot": "Slot Number",
-          "scan_interval": "Scan Interval (seconds)"
+          "scan_interval": "Scan Interval (ms)"
         }
       }
     },
@@ -63,7 +63,7 @@
         "title": "Scan Settings",
         "description": "How often should Home Assistant poll the PLC?",
         "data": {
-          "scan_interval": "Scan Interval (seconds)"
+          "scan_interval": "Scan Interval (ms)"
         }
       }
     },

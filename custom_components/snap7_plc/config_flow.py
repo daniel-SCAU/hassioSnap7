@@ -78,7 +78,7 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_SLOT, default=DEFAULT_SLOT): vol.Coerce(int),
                 vol.Optional(
                     CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
-                ): vol.All(vol.Coerce(int), vol.Range(min=1)),
+                ): vol.All(vol.Coerce(int), vol.Range(min=100)),
             }
         )
 
@@ -126,7 +126,7 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(
                     CONF_SCAN_INTERVAL,
                     default=entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                ): vol.All(vol.Coerce(int), vol.Range(min=1)),
+                ): vol.All(vol.Coerce(int), vol.Range(min=100)),
             }
         )
 
@@ -248,7 +248,7 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             {
                 vol.Optional(
                     CONF_SCAN_INTERVAL, default=self._scan_interval
-                ): vol.All(vol.Coerce(int), vol.Range(min=1)),
+                ): vol.All(vol.Coerce(int), vol.Range(min=100)),
             }
         )
 
