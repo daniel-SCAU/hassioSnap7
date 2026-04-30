@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Siemens PLC",
+        "description": "Enter the connection details for your Siemens S7 PLC.",
+        "data": {
+          "plc_ip": "PLC IP Address",
+          "rack": "Rack Number",
+          "slot": "Slot Number",
+          "scan_interval": "Scan Interval (seconds)"
+        }
+      },
+      "reconfigure": {
+        "title": "Update PLC Connection",
+        "description": "Update the connection parameters for your Siemens S7 PLC.",
+        "data": {
+          "plc_ip": "PLC IP Address",
+          "rack": "Rack Number",
+          "slot": "Slot Number",
+          "scan_interval": "Scan Interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the PLC. Verify the IP address, rack, and slot are correct and that the PLC is accessible."
+    },
+    "abort": {
+      "already_configured": "This PLC IP address is already configured.",
+      "reconfigure_successful": "Connection parameters updated successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "menu": {
+        "title": "Manage PLC Tags",
+        "menu_options": {
+          "add_tag": "Add a new tag",
+          "remove_tag": "Remove existing tag(s)",
+          "settings": "Update scan interval",
+          "save": "Save and close"
+        }
+      },
+      "add_tag": {
+        "title": "Add PLC Tag",
+        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`",
+        "data": {
+          "name": "Tag Name",
+          "address": "PLC Address",
+          "data_type": "Data Type",
+          "unit": "Unit of Measurement (optional)",
+          "writable": "Writable — creates a Switch entity for boolean tags"
+        }
+      },
+      "remove_tag": {
+        "title": "Remove Tags",
+        "description": "Select one or more tags to remove.",
+        "data": {
+          "tags_to_remove": "Tags to Remove"
+        }
+      },
+      "settings": {
+        "title": "Scan Settings",
+        "description": "How often should Home Assistant poll the PLC?",
+        "data": {
+          "scan_interval": "Scan Interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "invalid_address": "Invalid PLC address format. See the description above for supported formats."
+    }
+  }
+}

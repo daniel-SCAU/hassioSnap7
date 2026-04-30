@@ -1,0 +1,10 @@
+{
+  "domain": "snap7_plc",
+  "name": "Snap7 PLC",
+  "documentation": "https://github.com/daniel-SCAU/hassioSnap7",
+  "requirements": ["python-snap7==1.3"],
+  "codeowners": [],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "version": "1.0.0"
+}
