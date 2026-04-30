@@ -8,6 +8,7 @@ CONF_RACK = "rack"
 CONF_SLOT = "slot"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_TAGS = "tags"
+CONF_LIBRARY = "library"
 
 # Tag-level config keys
 CONF_TAG_NAME = "name"
@@ -20,6 +21,11 @@ CONF_TAG_WRITABLE = "writable"
 DEFAULT_RACK = 0
 DEFAULT_SLOT = 1
 DEFAULT_SCAN_INTERVAL = 30000
+
+# Supported PLC communication libraries
+LIBRARY_SNAP7 = "snap7"
+LIBRARY_OPTIONS = [LIBRARY_SNAP7]
+DEFAULT_LIBRARY = LIBRARY_SNAP7
 
 # PLC memory areas
 AREA_M = "M"

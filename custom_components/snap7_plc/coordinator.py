@@ -11,6 +11,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .backends import PlcBackend, create_backend
 from .const import (
     AREA_DB,
     AREA_M,
@@ -22,6 +23,7 @@ from .const import (
     DATA_TYPE_REAL,
     DATA_TYPE_STRING,
     DATA_TYPE_WORD,
+    DEFAULT_LIBRARY,
     DOMAIN,
 )
 
@@ -206,7 +208,7 @@ def _data_size(data_type: str) -> int:
 # ---------------------------------------------------------------------------
 
 class Snap7Coordinator(DataUpdateCoordinator):
-    """Periodically poll a Siemens PLC over the snap7 protocol."""
+    """Periodically poll a Siemens PLC over the S7 protocol."""
 
     def __init__(
         self,
@@ -216,6 +218,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
         slot: int,
         tags: list[dict],
         scan_interval: int,
+        library: str = DEFAULT_LIBRARY,
     ) -> None:
         super().__init__(
             hass,
@@ -227,7 +230,8 @@ class Snap7Coordinator(DataUpdateCoordinator):
         self.rack = rack
         self.slot = slot
         self.tags = tags
-        self._client: Any = None
+        self._library = library
+        self._backend: PlcBackend = create_backend(library)
         self._lock = threading.Lock()
 
         # Pre-parse all tag addresses once at startup
@@ -247,39 +251,25 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
     # ── connection management ───────────────────────────────────────────────
 
-    def _get_client(self):
-        """Return a connected snap7 client, (re-)connecting if needed."""
-        import snap7
-
-        if self._client is None:
-            self._client = snap7.client.Client()
-
-        if not self._client.get_connected():
-            self._client.connect(self.plc_ip, self.rack, self.slot)
-            if not self._client.get_connected():
+    def _ensure_connected(self) -> None:
+        """Ensure the backend has an active connection, reconnecting if needed."""
+        if not self._backend.is_connected():
+            self._backend.connect(self.plc_ip, self.rack, self.slot)
+            if not self._backend.is_connected():
                 raise ConnectionError(
                     f"Failed to connect to PLC at {self.plc_ip} "
                     f"(rack={self.rack}, slot={self.slot})"
                 )
 
-        return self._client
-
     def disconnect(self) -> None:
         """Gracefully disconnect from the PLC."""
         with self._lock:
-            if self._client is not None:
-                try:
-                    if self._client.get_connected():
-                        self._client.disconnect()
-                except Exception:  # noqa: BLE001
-                    pass
-                self._client = None
+            self._backend.disconnect()
 
     # ── read / write helpers (blocking – run in executor) ──────────────────
 
     def _read_value(self, parsed: dict) -> Any:
         """Read a single value from the PLC (blocking)."""
-        import snap7
         from snap7.util import (
             get_bool,
             get_dint,
@@ -288,9 +278,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
             get_real,
             get_word,
         )
-        from snap7.types import Areas
 
-        client = self._get_client()
         area = parsed["area"]
         db = parsed["db"]
         byte = parsed["byte"]
@@ -301,9 +289,9 @@ class Snap7Coordinator(DataUpdateCoordinator):
         if data_type == DATA_TYPE_STRING:
             length = parsed["string_length"]
             if area == AREA_DB:
-                raw = client.db_read(db, byte, length)
+                raw = self._backend.db_read(db, byte, length)
             else:
-                raw = client.read_area(Areas.MK, 0, byte, length)
+                raw = self._backend.read_area_mk(byte, length)
             _ASCII_PRINTABLE_MIN = 32
             _ASCII_PRINTABLE_MAX = 126
             return "".join(
@@ -314,9 +302,9 @@ class Snap7Coordinator(DataUpdateCoordinator):
         size = _data_size(data_type)
 
         if area == AREA_DB:
-            raw = client.db_read(db, byte, size)
+            raw = self._backend.db_read(db, byte, size)
         else:
-            raw = client.read_area(Areas.MK, 0, byte, size)
+            raw = self._backend.read_area_mk(byte, size)
 
         if data_type == DATA_TYPE_BOOL:
             return get_bool(raw, 0, bit)
@@ -344,7 +332,6 @@ class Snap7Coordinator(DataUpdateCoordinator):
             set_real,
             set_word,
         )
-        from snap7.types import Areas
 
         if tag_id not in self._parsed_tags:
             raise ValueError(f"Tag '{tag_id}' not found in coordinator")
@@ -353,7 +340,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
         with self._lock:
             try:
-                client = self._get_client()
+                self._ensure_connected()
                 area = parsed["area"]
                 db = parsed["db"]
                 byte = parsed["byte"]
@@ -363,9 +350,9 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
                 # Read-modify-write (required for bit operations)
                 if area == AREA_DB:
-                    raw = client.db_read(db, byte, size)
+                    raw = self._backend.db_read(db, byte, size)
                 else:
-                    raw = client.read_area(Areas.MK, 0, byte, size)
+                    raw = self._backend.read_area_mk(byte, size)
 
                 if data_type == DATA_TYPE_BOOL:
                     set_bool(raw, 0, bit, bool(value))
@@ -407,11 +394,11 @@ class Snap7Coordinator(DataUpdateCoordinator):
                     set_real(raw, 0, f)
 
                 if area == AREA_DB:
-                    client.db_write(db, byte, raw)
+                    self._backend.db_write(db, byte, raw)
                 else:
-                    client.write_area(Areas.MK, 0, byte, raw)
+                    self._backend.write_area_mk(byte, raw)
             except Exception:
-                self._client = None
+                self._backend.disconnect()
                 raise
 
     # ── async wrappers ──────────────────────────────────────────────────────
@@ -428,9 +415,9 @@ class Snap7Coordinator(DataUpdateCoordinator):
         with self._lock:
             # Ensure the client connects (raises on failure – caught by caller)
             try:
-                self._get_client()
+                self._ensure_connected()
             except Exception:
-                self._client = None
+                self._backend.disconnect()
                 raise
 
             result: dict[str, Any] = {}
@@ -453,7 +440,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
                     failed += 1
 
             if self.tags and failed == len(self.tags):
-                self._client = None
+                self._backend.disconnect()
                 raise ConnectionError(
                     f"All {failed} PLC tag read(s) failed for {self.plc_ip} – "
                     "disconnecting client"

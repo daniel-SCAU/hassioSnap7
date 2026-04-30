@@ -11,6 +11,7 @@ from homeassistant.core import callback
 import homeassistant.helpers.config_validation as cv
 
 from .const import (
+    CONF_LIBRARY,
     CONF_PLC_IP,
     CONF_RACK,
     CONF_SCAN_INTERVAL,
@@ -18,10 +19,12 @@ from .const import (
     CONF_TAGS,
     DATA_TYPE_BOOL,
     DATA_TYPES,
+    DEFAULT_LIBRARY,
     DEFAULT_RACK,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SLOT,
     DOMAIN,
+    LIBRARY_OPTIONS,
 )
 from .coordinator import parse_address
 
@@ -30,12 +33,12 @@ _S7_PORT = 102  # Standard Siemens S7 TCP port
 _NETWORK_TIMEOUT = 3  # seconds
 
 
-def _validate_connection_config(plc_ip: str, rack: int, slot: int) -> str | None:
+def _validate_connection_config(plc_ip: str, rack: int, slot: int, library: str) -> str | None:
     """Validate config entry inputs; return an error key or *None* on success.
 
     Steps
     -----
-    1. Verify that the ``snap7`` library can be imported (checks installation).
+    1. Verify that the selected PLC library can be imported (checks installation).
     2. Validate that *plc_ip* is a syntactically valid IP address.
 
     The actual TCP/PLC connection is intentionally **not** tested here so that
@@ -44,11 +47,16 @@ def _validate_connection_config(plc_ip: str, rack: int, slot: int) -> str | None
     """
     import ipaddress
 
+    from .const import LIBRARY_SNAP7
+
     # ── Step 1: library available? ──────────────────────────────────────────
-    try:
-        import snap7 as _snap7  # noqa: F401
-    except ImportError:
-        return "snap7_not_installed"
+    if library == LIBRARY_SNAP7:
+        try:
+            import snap7 as _snap7  # noqa: F401
+        except ImportError:
+            return "snap7_not_installed"
+    else:
+        return "library_not_supported"
 
     # ── Step 2: valid IP address format? ────────────────────────────────────
     try:
@@ -80,6 +88,7 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input[CONF_PLC_IP],
                 user_input[CONF_RACK],
                 user_input[CONF_SLOT],
+                user_input.get(CONF_LIBRARY, DEFAULT_LIBRARY),
             )
             if error_key:
                 errors["base"] = error_key
@@ -102,6 +111,9 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(
                     CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
                 ): vol.All(vol.Coerce(int), vol.Range(min=100)),
+                vol.Optional(CONF_LIBRARY, default=DEFAULT_LIBRARY): vol.In(
+                    LIBRARY_OPTIONS
+                ),
             }
         )
 
@@ -122,6 +134,7 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input[CONF_PLC_IP],
                 user_input[CONF_RACK],
                 user_input[CONF_SLOT],
+                user_input.get(CONF_LIBRARY, DEFAULT_LIBRARY),
             )
             if error_key:
                 errors["base"] = error_key
@@ -152,6 +165,10 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_SCAN_INTERVAL,
                     default=entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                 ): vol.All(vol.Coerce(int), vol.Range(min=100)),
+                vol.Optional(
+                    CONF_LIBRARY,
+                    default=entry.data.get(CONF_LIBRARY, DEFAULT_LIBRARY),
+                ): vol.In(LIBRARY_OPTIONS),
             }
         )
 
