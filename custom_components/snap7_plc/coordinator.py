@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 import threading
 from datetime import timedelta
@@ -398,8 +399,6 @@ class Snap7Coordinator(DataUpdateCoordinator):
                         )
                     set_dint(raw, 0, v)
                 elif data_type == DATA_TYPE_REAL:
-                    import math
-
                     f = float(value)
                     if not math.isfinite(f):
                         raise ValueError(

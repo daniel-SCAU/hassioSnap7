@@ -291,7 +291,6 @@ class TestThreadLock:
 
     def test_lock_is_reentrant_check(self):
         """_fetch_all must NOT deadlock (calls disconnect()-like code inside lock)."""
-        import sys
         from tests.conftest import _FakeSnap7Client
 
         coord = _make_coordinator(tags=[_bool_tag()])
@@ -372,7 +371,6 @@ class TestFetchAllFailure:
 
     def test_no_tags_returns_empty_dict(self):
         """With no tags configured, _fetch_all returns an empty dict."""
-        import sys
         from tests.conftest import _FakeSnap7Client
 
         coord = _make_coordinator(tags=[])
@@ -385,12 +383,6 @@ class TestFetchAllFailure:
         coord = _make_coordinator(tags=[_bool_tag()])
         coord._client = None  # force reconnect path
 
-        bad_client = MagicMock()
-        bad_client.get_connected.return_value = False  # connect appears to fail
-        bad_client.connect.return_value = None
-
-        import sys
-        snap7_mod = sys.modules.get("snap7")
         snap7_client_mod = sys.modules.get("snap7.client")
         original_cls = snap7_client_mod.Client
 
