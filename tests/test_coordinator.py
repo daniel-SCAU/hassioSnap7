@@ -254,12 +254,14 @@ class TestInvalidAddresses:
 
 def _make_coordinator(tags=None):
     """Create a Snap7Coordinator with no real HA instance for unit testing."""
+    from custom_components.snap7_plc.backends import Snap7Backend
+
     coord = Snap7Coordinator.__new__(Snap7Coordinator)
     coord.plc_ip = "192.168.1.100"
     coord.rack = 0
     coord.slot = 1
     coord.tags = tags or []
-    coord._client = None
+    coord._backend = Snap7Backend()
     coord._lock = threading.Lock()
     coord._parsed_tags = {}
     for tag in (tags or []):
@@ -270,6 +272,11 @@ def _make_coordinator(tags=None):
         except ValueError:
             pass
     return coord
+
+
+def _set_backend_client(coord, client):
+    """Inject *client* directly into the coordinator's Snap7Backend."""
+    coord._backend._client = client
 
 
 def _bool_tag(tag_id: str = "t1") -> dict:
@@ -294,8 +301,8 @@ class TestThreadLock:
         from tests.conftest import _FakeSnap7Client
 
         coord = _make_coordinator(tags=[_bool_tag()])
-        # Pre-set a connected client so _get_client() doesn't reconnect
-        coord._client = _FakeSnap7Client()
+        # Pre-set a connected client so _ensure_connected() doesn't reconnect
+        _set_backend_client(coord, _FakeSnap7Client())
 
         result = [None]
         exc_holder = [None]
@@ -328,25 +335,25 @@ class TestFetchAllFailure:
         bad_client = MagicMock()
         bad_client.get_connected.return_value = True
         bad_client.db_read.side_effect = RuntimeError("simulated read error")
-        coord._client = bad_client
+        _set_backend_client(coord, bad_client)
 
         with pytest.raises(ConnectionError, match="All.*tag read"):
             coord._fetch_all()
 
     def test_all_reads_fail_resets_client(self):
-        """When all reads fail, _client must be cleared so next poll reconnects."""
+        """When all reads fail, the backend must be disconnected so next poll reconnects."""
         tag = _bool_tag()
         coord = _make_coordinator(tags=[tag])
 
         bad_client = MagicMock()
         bad_client.get_connected.return_value = True
         bad_client.db_read.side_effect = RuntimeError("simulated read error")
-        coord._client = bad_client
+        _set_backend_client(coord, bad_client)
 
         with pytest.raises(ConnectionError):
             coord._fetch_all()
 
-        assert coord._client is None
+        assert not coord._backend.is_connected()
 
     def test_partial_failure_returns_partial_data(self):
         """When only some tags fail, _fetch_all should return partial results."""
@@ -363,7 +370,7 @@ class TestFetchAllFailure:
         ok_client = MagicMock()
         ok_client.get_connected.return_value = True
         ok_client.db_read.side_effect = selective_read
-        coord._client = ok_client
+        _set_backend_client(coord, ok_client)
 
         result = coord._fetch_all()
         assert result["t1"] is not None  # bool read succeeded
@@ -374,14 +381,15 @@ class TestFetchAllFailure:
         from tests.conftest import _FakeSnap7Client
 
         coord = _make_coordinator(tags=[])
-        coord._client = _FakeSnap7Client()
+        _set_backend_client(coord, _FakeSnap7Client())
         result = coord._fetch_all()
         assert result == {}
 
     def test_connection_failure_resets_client(self):
-        """If _get_client() itself fails, _client is reset to None."""
+        """If _ensure_connected() itself fails, the backend must be reset."""
         coord = _make_coordinator(tags=[_bool_tag()])
-        coord._client = None  # force reconnect path
+        # Backend starts with _client=None so it will attempt to create one
+        assert coord._backend._client is None
 
         snap7_client_mod = sys.modules.get("snap7.client")
         original_cls = snap7_client_mod.Client
@@ -396,7 +404,7 @@ class TestFetchAllFailure:
         try:
             with pytest.raises(ConnectionError):
                 coord._fetch_all()
-            assert coord._client is None
+            assert not coord._backend.is_connected()
         finally:
             snap7_client_mod.Client = original_cls
 
@@ -410,7 +418,7 @@ def _make_write_coordinator(tag):
     from tests.conftest import _FakeSnap7Client
 
     coord = _make_coordinator(tags=[tag])
-    coord._client = _FakeSnap7Client()
+    _set_backend_client(coord, _FakeSnap7Client())
     return coord
 
 
@@ -481,19 +489,19 @@ class TestWriteRangeValidation:
             coord._write_value("t1", float("nan"))
 
     def test_write_failure_resets_client(self):
-        """A write failure must clear _client so the next poll reconnects."""
+        """A write failure must disconnect the backend so the next poll reconnects."""
         tag = _bool_tag()
         coord = _make_coordinator(tags=[tag])
 
         bad_client = MagicMock()
         bad_client.get_connected.return_value = True
         bad_client.db_read.side_effect = RuntimeError("write channel broken")
-        coord._client = bad_client
+        _set_backend_client(coord, bad_client)
 
         with pytest.raises(RuntimeError):
             coord._write_value("t1", True)
 
-        assert coord._client is None
+        assert not coord._backend.is_connected()
 
     def test_unknown_tag_raises_value_error(self):
         coord = _make_coordinator(tags=[])

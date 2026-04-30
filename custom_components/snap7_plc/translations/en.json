@@ -8,7 +8,8 @@
           "plc_ip": "PLC IP Address",
           "rack": "Rack Number",
           "slot": "Slot Number",
-          "scan_interval": "Scan Interval (ms)"
+          "scan_interval": "Scan Interval (ms)",
+          "library": "PLC Communication Library"
         }
       },
       "reconfigure": {
@@ -18,12 +19,14 @@
           "plc_ip": "PLC IP Address",
           "rack": "Rack Number",
           "slot": "Slot Number",
-          "scan_interval": "Scan Interval (ms)"
+          "scan_interval": "Scan Interval (ms)",
+          "library": "PLC Communication Library"
         }
       }
     },
     "error": {
       "snap7_not_installed": "The python-snap7 library is not installed. Restart Home Assistant and try again — it should be installed automatically. If the problem persists, check your Home Assistant logs for pip errors.",
+      "library_not_supported": "The selected PLC communication library is not supported. Please choose a supported library.",
       "invalid_ip": "The value entered is not a valid IP address. Please enter a valid IPv4 or IPv6 address."
     },
     "abort": {
