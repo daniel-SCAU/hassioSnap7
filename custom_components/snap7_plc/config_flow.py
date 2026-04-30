@@ -25,17 +25,46 @@ from .const import (
 from .coordinator import parse_address
 
 
-def _try_connect(plc_ip: str, rack: int, slot: int) -> None:
-    """Attempt a synchronous connection to the PLC (raises on failure)."""
-    import snap7
+_S7_PORT = 102  # Standard Siemens S7 TCP port
+_NETWORK_TIMEOUT = 3  # seconds
 
-    client = snap7.client.Client()
-    client.connect(plc_ip, rack, slot)
-    if not client.get_connected():
-        raise ConnectionError(
-            f"Failed to connect to PLC at {plc_ip} (rack={rack}, slot={slot})"
-        )
-    client.disconnect()
+
+def _diagnose_connection(plc_ip: str, rack: int, slot: int) -> str | None:
+    """Run three-step diagnostics and return an error key, or *None* on success.
+
+    Steps
+    -----
+    1. Verify that the ``snap7`` library can be imported (checks installation).
+    2. Open a raw TCP socket to port 102 to verify basic network reachability.
+    3. Use the snap7 client to connect and confirm the PLC responds.
+    """
+    import socket
+
+    # ── Step 1: library available? ──────────────────────────────────────────
+    try:
+        import snap7 as _snap7
+    except ImportError:
+        return "snap7_not_installed"
+
+    # ── Step 2: network reachable? ──────────────────────────────────────────
+    try:
+        with socket.create_connection((plc_ip, _S7_PORT), timeout=_NETWORK_TIMEOUT):
+            pass
+    except OSError:
+        return "network_unreachable"
+
+    # ── Step 3: PLC responding to S7 handshake? ─────────────────────────────
+    try:
+        client = _snap7.client.Client()
+        client.connect(plc_ip, rack, slot)
+        connected = client.get_connected()
+        client.disconnect()
+        if not connected:
+            return "cannot_connect"
+    except Exception:  # noqa: BLE001
+        return "cannot_connect"
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -54,15 +83,14 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            try:
-                await self.hass.async_add_executor_job(
-                    _try_connect,
-                    user_input[CONF_PLC_IP],
-                    user_input[CONF_RACK],
-                    user_input[CONF_SLOT],
-                )
-            except Exception:  # noqa: BLE001
-                errors["base"] = "cannot_connect"
+            error_key = await self.hass.async_add_executor_job(
+                _diagnose_connection,
+                user_input[CONF_PLC_IP],
+                user_input[CONF_RACK],
+                user_input[CONF_SLOT],
+            )
+            if error_key:
+                errors["base"] = error_key
             else:
                 await self.async_set_unique_id(user_input[CONF_PLC_IP])
                 self._abort_if_unique_id_configured()
@@ -94,15 +122,14 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         entry = self._get_reconfigure_entry()
 
         if user_input is not None:
-            try:
-                await self.hass.async_add_executor_job(
-                    _try_connect,
-                    user_input[CONF_PLC_IP],
-                    user_input[CONF_RACK],
-                    user_input[CONF_SLOT],
-                )
-            except Exception:  # noqa: BLE001
-                errors["base"] = "cannot_connect"
+            error_key = await self.hass.async_add_executor_job(
+                _diagnose_connection,
+                user_input[CONF_PLC_IP],
+                user_input[CONF_RACK],
+                user_input[CONF_SLOT],
+            )
+            if error_key:
+                errors["base"] = error_key
             else:
                 await self.async_set_unique_id(user_input[CONF_PLC_IP])
                 self._abort_if_unique_id_configured(
