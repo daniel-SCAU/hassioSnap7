@@ -215,7 +215,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=scan_interval),
+            update_interval=timedelta(milliseconds=scan_interval),
         )
         self.plc_ip = plc_ip
         self.rack = rack

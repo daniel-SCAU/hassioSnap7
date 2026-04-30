@@ -19,7 +19,7 @@ CONF_TAG_WRITABLE = "writable"
 # Default connection settings
 DEFAULT_RACK = 0
 DEFAULT_SLOT = 1
-DEFAULT_SCAN_INTERVAL = 30
+DEFAULT_SCAN_INTERVAL = 30000
 
 # PLC memory areas
 AREA_M = "M"
