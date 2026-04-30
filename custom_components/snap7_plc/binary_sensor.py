@@ -20,7 +20,7 @@ async def async_setup_entry(
     """Set up Snap7 binary sensor entities."""
     coordinator: Snap7Coordinator = hass.data[DOMAIN][entry.entry_id]
     entities = [
-        Snap7BinarySensor(coordinator, tag)
+        Snap7BinarySensor(coordinator, tag, entry.entry_id)
         for tag in coordinator.tags
         if tag["data_type"] == DATA_TYPE_BOOL and not tag.get("writable", False)
     ]
@@ -32,10 +32,11 @@ class Snap7BinarySensor(CoordinatorEntity[Snap7Coordinator], BinarySensorEntity)
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: Snap7Coordinator, tag: dict) -> None:
+    def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry_id: str) -> None:
         super().__init__(coordinator)
         self._tag = tag
-        self._attr_unique_id = f"{coordinator.plc_ip}_{tag['id']}"
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{entry_id}_{tag['id']}"
         self._attr_name = tag["name"]
 
     @property
@@ -57,7 +58,7 @@ class Snap7BinarySensor(CoordinatorEntity[Snap7Coordinator], BinarySensorEntity)
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.plc_ip)},
+            identifiers={(DOMAIN, self._entry_id)},
             name=f"Snap7 PLC {self.coordinator.plc_ip}",
             manufacturer="Siemens",
             model="S7 PLC",

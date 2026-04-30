@@ -62,11 +62,16 @@ def parse_address(address: str, data_type: str) -> dict:
     # ── DB area ────────────────────────────────────────────────────────────
     m = re.match(r"^DB(\d+)\.DBX(\d+)\.(\d+)$", addr)
     if m:
+        bit = int(m.group(3))
+        if bit > 7:
+            raise ValueError(
+                f"Bit index {bit!r} is out of range 0–7 in address '{address}'"
+            )
         return {
             "area": AREA_DB,
             "db": int(m.group(1)),
             "byte": int(m.group(2)),
-            "bit": int(m.group(3)),
+            "bit": bit,
             "data_type": DATA_TYPE_BOOL,
         }
 
@@ -119,11 +124,16 @@ def parse_address(address: str, data_type: str) -> dict:
     # ── M area ─────────────────────────────────────────────────────────────
     m = re.match(r"^M(\d+)\.(\d+)$", addr)
     if m:
+        bit = int(m.group(2))
+        if bit > 7:
+            raise ValueError(
+                f"Bit index {bit!r} is out of range 0–7 in address '{address}'"
+            )
         return {
             "area": AREA_M,
             "db": 0,
             "byte": int(m.group(1)),
-            "bit": int(m.group(2)),
+            "bit": bit,
             "data_type": DATA_TYPE_BOOL,
         }
 
@@ -313,9 +323,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
     def _write_value(self, tag_id: str, value: Any) -> None:
         """Write a value to the PLC (blocking)."""
-        import snap7
         from snap7.util import (
-            get_bool,
             set_bool,
             set_dint,
             set_dword,
@@ -377,9 +385,9 @@ class Snap7Coordinator(DataUpdateCoordinator):
         # Ensure the client connects (raises on failure – caught by caller)
         try:
             self._get_client()
-        except Exception as exc:
+        except Exception:
             self._client = None
-            raise exc
+            raise
 
         result: dict[str, Any] = {}
         for tag in self.tags:

@@ -226,3 +226,19 @@ class TestInvalidAddresses:
     def test_raises_value_error(self, addr):
         with pytest.raises(ValueError):
             parse_address(addr, DATA_TYPE_BOOL)
+
+    def test_m_bit_out_of_range(self):
+        with pytest.raises(ValueError, match="out of range"):
+            parse_address("M0.8", DATA_TYPE_BOOL)
+
+    def test_m_bit_max_valid(self):
+        result = parse_address("M0.7", DATA_TYPE_BOOL)
+        assert result["bit"] == 7
+
+    def test_dbx_bit_out_of_range(self):
+        with pytest.raises(ValueError, match="out of range"):
+            parse_address("DB1.DBX0.8", DATA_TYPE_BOOL)
+
+    def test_dbx_bit_max_valid(self):
+        result = parse_address("DB1.DBX0.7", DATA_TYPE_BOOL)
+        assert result["bit"] == 7

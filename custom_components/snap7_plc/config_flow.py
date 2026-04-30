@@ -179,7 +179,7 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             address = user_input.get("address", "").strip()
             data_type = user_input.get("data_type", "")
             try:
-                parse_address(address, data_type)
+                parsed = parse_address(address, data_type)
             except ValueError:
                 errors["address"] = "invalid_address"
             else:
@@ -187,7 +187,7 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
                     "id": str(uuid.uuid4()),
                     "name": user_input["name"].strip(),
                     "address": address,
-                    "data_type": data_type,
+                    "data_type": parsed["data_type"],
                     "unit": user_input.get("unit", ""),
                     "writable": user_input.get("writable", False),
                 }
