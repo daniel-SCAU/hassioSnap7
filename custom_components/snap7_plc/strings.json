@@ -24,11 +24,10 @@
     },
     "error": {
       "snap7_not_installed": "The python-snap7 library is not installed. Restart Home Assistant and try again — it should be installed automatically. If the problem persists, check your Home Assistant logs for pip errors.",
-      "network_unreachable": "The PLC IP address is not reachable on the network (TCP port 102 timed out). Check that the IP address is correct, the PLC is powered on, and the network cable / firewall allows S7 traffic.",
-      "cannot_connect": "The host is reachable but the PLC did not accept the S7 connection. Verify that the Rack and Slot numbers are correct, that the PLC has PUT/GET access enabled, and that no firewall is blocking port 102."
+      "invalid_ip": "The value entered is not a valid IP address. Please enter a valid IPv4 or IPv6 address."
     },
     "abort": {
-      "already_configured": "This PLC IP address is already configured.",
+      "already_configured": "A PLC with this IP, rack, and slot combination is already configured.",
       "reconfigure_successful": "Connection parameters updated successfully."
     }
   },
@@ -45,13 +44,13 @@
       },
       "add_tag": {
         "title": "Add PLC Tag",
-        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`\n- String (N bytes, ASCII): `MB140(4)` or `DB1.DBB0(10)`",
+        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`\n- Raw ASCII bytes (N bytes): `MB140(4)` or `DB1.DBB0(10)`\n\n**Note:** Only boolean (`bool`) tags may be marked as Writable.",
         "data": {
           "name": "Tag Name",
           "address": "PLC Address",
           "data_type": "Data Type",
           "unit": "Unit of Measurement (optional)",
-          "writable": "Writable — creates a Switch entity for boolean tags"
+          "writable": "Writable — creates a Switch entity (boolean tags only)"
         }
       },
       "remove_tag": {
@@ -70,7 +69,8 @@
       }
     },
     "error": {
-      "invalid_address": "Invalid PLC address format. See the description above for supported formats."
+      "invalid_address": "Invalid PLC address format. See the description above for supported formats.",
+      "only_bool_writable": "Only boolean (bool) tags can be marked as Writable. Remove the Writable flag or choose a boolean address."
     }
   }
 }
