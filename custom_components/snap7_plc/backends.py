@@ -106,14 +106,14 @@ class Snap7Backend(PlcBackend):
         self._client.db_write(db, start, data)
 
     def read_area_mk(self, start: int, size: int) -> bytearray:
-        from snap7.types import Areas
+        from snap7.type import Area
 
-        return bytearray(self._client.read_area(Areas.MK, 0, start, size))
+        return bytearray(self._client.read_area(Area.MK, 0, start, size))
 
     def write_area_mk(self, start: int, data: bytearray) -> None:
-        from snap7.types import Areas
+        from snap7.type import Area
 
-        self._client.write_area(Areas.MK, 0, start, data)
+        self._client.write_area(Area.MK, 0, start, data)
 
 
 # ---------------------------------------------------------------------------
