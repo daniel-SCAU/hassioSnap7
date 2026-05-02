@@ -29,6 +29,7 @@ _make_stub(
     "homeassistant.components.sensor",
     "homeassistant.components.binary_sensor",
     "homeassistant.components.switch",
+    "homeassistant.components.number",
 )
 
 # Minimal classes used at import time
@@ -40,6 +41,7 @@ ha_const.Platform = types.SimpleNamespace(  # type: ignore[attr-defined]
     SENSOR="sensor",
     BINARY_SENSOR="binary_sensor",
     SWITCH="switch",
+    NUMBER="number",
 )
 
 ha_entries = sys.modules["homeassistant.config_entries"]
