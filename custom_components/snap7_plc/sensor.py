@@ -40,7 +40,6 @@ class Snap7Sensor(CoordinatorEntity[Snap7Coordinator], SensorEntity):
     def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry_id: str) -> None:
         super().__init__(coordinator)
         self._tag = tag
-        self._entry_id = entry_id
         self._attr_unique_id = f"{entry_id}_{tag['id']}"
         self._attr_name = tag["name"]
         unit = tag.get("unit", "")
@@ -65,7 +64,8 @@ class Snap7Sensor(CoordinatorEntity[Snap7Coordinator], SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self._entry_id)},
+            identifiers={(DOMAIN, self.coordinator.plc_ip)},
+            name=self.coordinator.plc_name,
             manufacturer="Siemens",
             model="S7 PLC",
         )

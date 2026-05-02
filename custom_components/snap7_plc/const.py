@@ -4,6 +4,7 @@ DOMAIN = "snap7_plc"
 
 # Config / options keys
 CONF_PLC_IP = "plc_ip"
+CONF_PLC_NAME = "plc_name"
 CONF_RACK = "rack"
 CONF_SLOT = "slot"
 CONF_SCAN_INTERVAL = "scan_interval"

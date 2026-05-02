@@ -13,6 +13,7 @@ import homeassistant.helpers.config_validation as cv
 from .const import (
     CONF_LIBRARY,
     CONF_PLC_IP,
+    CONF_PLC_NAME,
     CONF_RACK,
     CONF_SCAN_INTERVAL,
     CONF_SLOT,
@@ -97,16 +98,18 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 plc_ip = user_input[CONF_PLC_IP]
                 rack = user_input[CONF_RACK]
                 slot = user_input[CONF_SLOT]
+                plc_name = user_input.get(CONF_PLC_NAME, "").strip() or f"PLC {plc_ip}"
                 await self.async_set_unique_id(f"{plc_ip}:{rack}:{slot}")
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
-                    title=f"PLC {plc_ip}",
-                    data=user_input,
+                    title=plc_name,
+                    data={**user_input, CONF_PLC_NAME: plc_name},
                 )
 
         schema = vol.Schema(
             {
                 vol.Required(CONF_PLC_IP): str,
+                vol.Optional(CONF_PLC_NAME, default=""): str,
                 vol.Optional(CONF_RACK, default=DEFAULT_RACK): vol.Coerce(int),
                 vol.Optional(CONF_SLOT, default=DEFAULT_SLOT): vol.Coerce(int),
                 vol.Optional(
@@ -143,18 +146,22 @@ class Snap7ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 plc_ip = user_input[CONF_PLC_IP]
                 rack = user_input[CONF_RACK]
                 slot = user_input[CONF_SLOT]
+                plc_name = user_input.get(CONF_PLC_NAME, "").strip() or f"PLC {plc_ip}"
                 await self.async_set_unique_id(f"{plc_ip}:{rack}:{slot}")
                 self._abort_if_unique_id_configured(
                     updates=user_input, reload_on_update=False
                 )
                 return self.async_update_reload_and_abort(
-                    entry, data_updates=user_input
+                    entry, data_updates={**user_input, CONF_PLC_NAME: plc_name}, title=plc_name
                 )
 
         schema = vol.Schema(
             {
                 vol.Required(
                     CONF_PLC_IP, default=entry.data.get(CONF_PLC_IP, "")
+                ): str,
+                vol.Optional(
+                    CONF_PLC_NAME, default=entry.data.get(CONF_PLC_NAME, "")
                 ): str,
                 vol.Optional(
                     CONF_RACK, default=entry.data.get(CONF_RACK, DEFAULT_RACK)

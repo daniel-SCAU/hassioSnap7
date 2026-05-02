@@ -11,6 +11,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .const import (
     CONF_LIBRARY,
     CONF_PLC_IP,
+    CONF_PLC_NAME,
     CONF_RACK,
     CONF_SCAN_INTERVAL,
     CONF_SLOT,
@@ -49,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         tags=tags,
         scan_interval=scan_interval,
         library=entry.data.get(CONF_LIBRARY, DEFAULT_LIBRARY),
+        plc_name=entry.data.get(CONF_PLC_NAME, ""),
     )
 
     try:

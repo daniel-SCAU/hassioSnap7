@@ -241,6 +241,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
         tags: list[dict],
         scan_interval: int,
         library: str = DEFAULT_LIBRARY,
+        plc_name: str = "",
     ) -> None:
         super().__init__(
             hass,
@@ -249,6 +250,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
             update_interval=timedelta(milliseconds=scan_interval),
         )
         self.plc_ip = plc_ip
+        self.plc_name = plc_name or f"PLC {plc_ip}"
         self.rack = rack
         self.slot = slot
         self.tags = tags
