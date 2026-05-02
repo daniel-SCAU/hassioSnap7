@@ -679,3 +679,11 @@ class TestFormatPlcDate:
         """3032024 should format as 3/3/2024."""
         assert _format_plc_date(3032024) == "3/3/2024"
 
+    def test_negative_value_returns_invalid(self):
+        """Negative DINT values are not valid dates."""
+        assert _format_plc_date(-1052026) == "Invalid date: -1052026"
+
+    def test_too_short_returns_invalid(self):
+        """Values with fewer than 6 digits cannot encode a valid date."""
+        assert _format_plc_date(12345) == "Invalid date: 12345"
+

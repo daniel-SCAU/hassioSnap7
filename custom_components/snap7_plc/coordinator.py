@@ -214,9 +214,11 @@ def _format_plc_date(value: int) -> str:
     *  ``1052026``  → ``1/5/2026``
     * ``25102026``  → ``25/10/2026``
     """
-    s = str(abs(value))
+    if value < 0:
+        return f"Invalid date: {value}"
+    s = str(value)
     if len(s) < 6:
-        return str(value)
+        return f"Invalid date: {value}"
     year = int(s[-4:])
     month = int(s[-6:-4])
     day = int(s[:-6])
