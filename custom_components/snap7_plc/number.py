@@ -32,6 +32,7 @@ async def async_setup_entry(
 class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
     """A writable number entity that reads and writes a real value on the PLC."""
 
+    _attr_has_entity_name = False
     _attr_native_min_value = -1000000.0
     _attr_native_max_value = 1000000.0
     _attr_native_step = 1.0

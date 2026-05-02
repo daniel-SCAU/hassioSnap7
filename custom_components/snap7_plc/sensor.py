@@ -30,6 +30,8 @@ async def async_setup_entry(
 class Snap7Sensor(CoordinatorEntity[Snap7Coordinator], SensorEntity):
     """A sensor entity that reads a numeric value from the PLC."""
 
+    _attr_has_entity_name = False
+
     def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry_id: str) -> None:
         super().__init__(coordinator)
         self._tag = tag
