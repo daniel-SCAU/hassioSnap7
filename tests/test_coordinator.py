@@ -571,6 +571,26 @@ class TestWritableValidation:
         is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
         assert not is_error
 
+    def test_mw_input_number_writable_is_valid(self):
+        """input_number on a 16-bit MW address must pass writable validation (resolves to int)."""
+        address = "MW12"
+        writable = True
+
+        parsed = parse_address(address, DATA_TYPE_INPUT_NUMBER)
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
+        assert not is_error
+        assert parsed["data_type"] == DATA_TYPE_INT
+
+    def test_dbw_input_number_writable_is_valid(self):
+        """input_number on a 16-bit DBW address must pass writable validation (resolves to int)."""
+        address = "DB1.DBW12"
+        writable = True
+
+        parsed = parse_address(address, DATA_TYPE_INPUT_NUMBER)
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
+        assert not is_error
+        assert parsed["data_type"] == DATA_TYPE_INT
+
     def test_int_writable_is_valid(self):
         address = "DB1.DBW0"
         writable = True
