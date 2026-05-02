@@ -59,7 +59,6 @@ class Snap7BinarySensor(CoordinatorEntity[Snap7Coordinator], BinarySensorEntity)
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry_id)},
-            name=f"Snap7 PLC {self.coordinator.plc_ip}",
             manufacturer="Siemens",
             model="S7 PLC",
         )
