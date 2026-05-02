@@ -17,8 +17,10 @@ from .const import (
     AREA_M,
     DATA_TYPE_BOOL,
     DATA_TYPE_BYTE,
+    DATA_TYPE_DATE,
     DATA_TYPE_DINT,
     DATA_TYPE_DWORD,
+    DATA_TYPE_INPUT_NUMBER,
     DATA_TYPE_INT,
     DATA_TYPE_REAL,
     DATA_TYPE_STRING,
@@ -120,7 +122,7 @@ def parse_address(address: str, data_type: str) -> dict:
 
     m = re.match(r"^DB(\d+)\.DBD(\d+)$", addr)
     if m:
-        valid = [DATA_TYPE_DWORD, DATA_TYPE_DINT, DATA_TYPE_REAL]
+        valid = [DATA_TYPE_DWORD, DATA_TYPE_DINT, DATA_TYPE_REAL, DATA_TYPE_INPUT_NUMBER, DATA_TYPE_DATE]
         return {
             "area": AREA_DB,
             "db": int(m.group(1)),
@@ -182,7 +184,7 @@ def parse_address(address: str, data_type: str) -> dict:
 
     m = re.match(r"^MD(\d+)$", addr)
     if m:
-        valid = [DATA_TYPE_DWORD, DATA_TYPE_DINT, DATA_TYPE_REAL]
+        valid = [DATA_TYPE_DWORD, DATA_TYPE_DINT, DATA_TYPE_REAL, DATA_TYPE_INPUT_NUMBER, DATA_TYPE_DATE]
         return {
             "area": AREA_M,
             "db": 0,
@@ -200,7 +202,27 @@ def _data_size(data_type: str) -> int:
         return 1
     if data_type in (DATA_TYPE_WORD, DATA_TYPE_INT):
         return 2
-    return 4  # dword / dint / real
+    return 4  # dword / dint / real / input_number / date
+
+
+def _format_plc_date(value: int) -> str:
+    """Format a PLC DINT date value as ``d/m/yyyy``.
+
+    The PLC stores dates as a plain integer in ``dmmyyyy`` (7 digits) or
+    ``ddmmyyyy`` (8 digits) format, for example:
+
+    *  ``1052026``  → ``1/5/2026``
+    * ``25102026``  → ``25/10/2026``
+    """
+    if value < 0:
+        return f"Invalid date: {value}"
+    s = str(value)
+    if len(s) < 6:
+        return f"Invalid date: {value}"
+    year = int(s[-4:])
+    month = int(s[-6:-4])
+    day = int(s[:-6])
+    return f"{day}/{month}/{year}"
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +342,10 @@ class Snap7Coordinator(DataUpdateCoordinator):
             return get_dint(raw, 0)
         if data_type == DATA_TYPE_REAL:
             return get_real(raw, 0)
+        if data_type == DATA_TYPE_INPUT_NUMBER:
+            return get_real(raw, 0)
+        if data_type == DATA_TYPE_DATE:
+            return _format_plc_date(get_dint(raw, 0))
         return None
 
     def _write_value(self, tag_id: str, value: Any) -> None:
@@ -390,6 +416,13 @@ class Snap7Coordinator(DataUpdateCoordinator):
                     if not math.isfinite(f):
                         raise ValueError(
                             f"Real value {f!r} is not a finite number"
+                        )
+                    set_real(raw, 0, f)
+                elif data_type == DATA_TYPE_INPUT_NUMBER:
+                    f = float(value)
+                    if not math.isfinite(f):
+                        raise ValueError(
+                            f"Input number value {f!r} is not a finite number"
                         )
                     set_real(raw, 0, f)
 

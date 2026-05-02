@@ -18,6 +18,7 @@ from .const import (
     CONF_SLOT,
     CONF_TAGS,
     DATA_TYPE_BOOL,
+    DATA_TYPE_INPUT_NUMBER,
     DATA_TYPES,
     DEFAULT_LIBRARY,
     DEFAULT_RACK,
@@ -229,7 +230,7 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             except ValueError:
                 errors["address"] = "invalid_address"
             else:
-                if user_input.get("writable") and parsed["data_type"] != DATA_TYPE_BOOL:
+                if user_input.get("writable") and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER):
                     errors["writable"] = "only_bool_writable"
                 else:
                     tag: dict[str, Any] = {

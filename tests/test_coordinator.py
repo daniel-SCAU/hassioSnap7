@@ -12,14 +12,16 @@ import os
 # Add the repo root so we can import custom_components directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from custom_components.snap7_plc.coordinator import Snap7Coordinator, parse_address
+from custom_components.snap7_plc.coordinator import Snap7Coordinator, parse_address, _format_plc_date
 from custom_components.snap7_plc.const import (
     AREA_DB,
     AREA_M,
     DATA_TYPE_BOOL,
     DATA_TYPE_BYTE,
+    DATA_TYPE_DATE,
     DATA_TYPE_DINT,
     DATA_TYPE_DWORD,
+    DATA_TYPE_INPUT_NUMBER,
     DATA_TYPE_INT,
     DATA_TYPE_REAL,
     DATA_TYPE_STRING,
@@ -535,10 +537,10 @@ class TestScanInterval:
 # ---------------------------------------------------------------------------
 
 class TestWritableValidation:
-    """The writable=True flag is only valid for boolean tags."""
+    """The writable=True flag is valid for boolean and input_number tags."""
 
     def test_non_bool_writable_raises_in_config_logic(self):
-        """Simulate the config flow validation check."""
+        """Simulate the config flow validation check for a non-writable type."""
         from custom_components.snap7_plc.const import DATA_TYPE_WORD
 
         address = "DB1.DBW0"
@@ -546,8 +548,8 @@ class TestWritableValidation:
         writable = True
 
         parsed = parse_address(address, data_type)
-        is_error = writable and parsed["data_type"] != DATA_TYPE_BOOL
-        assert is_error, "Expected validation error for non-bool writable tag"
+        is_error = writable and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
+        assert is_error, "Expected validation error for non-bool/non-input_number writable tag"
 
     def test_bool_writable_is_valid(self):
         address = "DB1.DBX0.0"
@@ -555,7 +557,16 @@ class TestWritableValidation:
         writable = True
 
         parsed = parse_address(address, data_type)
-        is_error = writable and parsed["data_type"] != DATA_TYPE_BOOL
+        is_error = writable and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
+        assert not is_error
+
+    def test_input_number_writable_is_valid(self):
+        address = "DB1.DBD0"
+        data_type = DATA_TYPE_INPUT_NUMBER
+        writable = True
+
+        parsed = parse_address(address, data_type)
+        is_error = writable and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
         assert not is_error
 
     def test_non_bool_not_writable_is_valid(self):
@@ -566,7 +577,7 @@ class TestWritableValidation:
         writable = False
 
         parsed = parse_address(address, data_type)
-        is_error = writable and parsed["data_type"] != DATA_TYPE_BOOL
+        is_error = writable and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
         assert not is_error
 
 
@@ -588,3 +599,91 @@ class TestUniqueId:
         uid_slot1 = f"{plc_ip}:0:1"
         uid_slot2 = f"{plc_ip}:0:2"
         assert uid_slot1 != uid_slot2
+
+
+# ---------------------------------------------------------------------------
+# input_number type – address parsing
+# ---------------------------------------------------------------------------
+
+class TestInputNumberAddressParsing:
+    def test_db_dbd_input_number(self):
+        result = parse_address("DB1.DBD0", DATA_TYPE_INPUT_NUMBER)
+        assert result["area"] == AREA_DB
+        assert result["data_type"] == DATA_TYPE_INPUT_NUMBER
+
+    def test_m_md_input_number(self):
+        result = parse_address("MD4", DATA_TYPE_INPUT_NUMBER)
+        assert result["area"] == AREA_M
+        assert result["data_type"] == DATA_TYPE_INPUT_NUMBER
+
+    def test_input_number_data_size_is_4(self):
+        from custom_components.snap7_plc.coordinator import _data_size
+        assert _data_size(DATA_TYPE_INPUT_NUMBER) == 4
+
+    def test_input_number_write_valid(self):
+        tag = {"id": "t1", "name": "Setpoint", "address": "DB1.DBD0", "data_type": DATA_TYPE_INPUT_NUMBER}
+        coord = _make_write_coordinator(tag)
+        coord._write_value("t1", 42.5)  # must not raise
+
+    def test_input_number_write_inf_rejected(self):
+        tag = {"id": "t1", "name": "Setpoint", "address": "DB1.DBD0", "data_type": DATA_TYPE_INPUT_NUMBER}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="not a finite"):
+            coord._write_value("t1", float("inf"))
+
+    def test_input_number_write_nan_rejected(self):
+        tag = {"id": "t1", "name": "Setpoint", "address": "DB1.DBD0", "data_type": DATA_TYPE_INPUT_NUMBER}
+        coord = _make_write_coordinator(tag)
+        with pytest.raises(ValueError, match="not a finite"):
+            coord._write_value("t1", float("nan"))
+
+
+# ---------------------------------------------------------------------------
+# date type – address parsing and formatting
+# ---------------------------------------------------------------------------
+
+class TestDateAddressParsing:
+    def test_db_dbd_date(self):
+        result = parse_address("DB1.DBD0", DATA_TYPE_DATE)
+        assert result["area"] == AREA_DB
+        assert result["data_type"] == DATA_TYPE_DATE
+
+    def test_m_md_date(self):
+        result = parse_address("MD8", DATA_TYPE_DATE)
+        assert result["area"] == AREA_M
+        assert result["data_type"] == DATA_TYPE_DATE
+
+    def test_date_data_size_is_4(self):
+        from custom_components.snap7_plc.coordinator import _data_size
+        assert _data_size(DATA_TYPE_DATE) == 4
+
+
+class TestFormatPlcDate:
+    def test_seven_digit_date(self):
+        """1052026 (dmmyyyy) should format as 1/5/2026."""
+        assert _format_plc_date(1052026) == "1/5/2026"
+
+    def test_eight_digit_date(self):
+        """25102026 (ddmmyyyy) should format as 25/10/2026."""
+        assert _format_plc_date(25102026) == "25/10/2026"
+
+    def test_leading_zero_month_stripped(self):
+        """Month 01 should display as 1, not 01."""
+        assert _format_plc_date(1012026) == "1/1/2026"
+
+    def test_end_of_year(self):
+        """31122025 should format as 31/12/2025."""
+        assert _format_plc_date(31122025) == "31/12/2025"
+
+    def test_single_digit_day_and_month(self):
+        """3032024 should format as 3/3/2024."""
+        assert _format_plc_date(3032024) == "3/3/2024"
+
+    def test_negative_value_returns_invalid(self):
+        """Negative DINT values are not valid dates."""
+        assert _format_plc_date(-1052026) == "Invalid date: -1052026"
+
+    def test_too_short_returns_invalid(self):
+        """Values with fewer than 6 digits cannot encode a valid date."""
+        assert _format_plc_date(12345) == "Invalid date: 12345"
+
