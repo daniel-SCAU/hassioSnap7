@@ -10,7 +10,15 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DATA_TYPE_INPUT_NUMBER, DOMAIN
+from .const import (
+    CONF_PLC_IP,
+    CONF_RACK,
+    CONF_SLOT,
+    DATA_TYPE_INPUT_NUMBER,
+    DEFAULT_RACK,
+    DEFAULT_SLOT,
+    DOMAIN,
+)
 from .coordinator import Snap7Coordinator
 
 
@@ -22,7 +30,7 @@ async def async_setup_entry(
     """Set up Snap7 number entities."""
     coordinator: Snap7Coordinator = hass.data[DOMAIN][entry.entry_id]
     entities = [
-        Snap7Number(coordinator, tag, entry.entry_id)
+        Snap7Number(coordinator, tag, entry)
         for tag in coordinator.tags
         if tag["data_type"] == DATA_TYPE_INPUT_NUMBER
     ]
@@ -43,12 +51,17 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
     _attr_native_max_value = 1000000.0
     _attr_native_step = 1.0
 
-    def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry_id: str) -> None:
+    def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
         self._tag = tag
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_{tag['id']}"
-        self._attr_name = tag["name"]
+        self._device_id = (
+            f"{entry.data[CONF_PLC_IP]}:"
+            f"{entry.data.get(CONF_RACK, DEFAULT_RACK)}:"
+            f"{entry.data.get(CONF_SLOT, DEFAULT_SLOT)}"
+        )
+        self._device_name = entry.title
+        self._attr_unique_id = f"{self._device_id}_{tag['id']}"
+        self._attr_name = tag["name"].strip()
         unit = tag.get("unit", "")
         if unit:
             self._attr_native_unit_of_measurement = unit
@@ -76,7 +89,8 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self._entry_id)},
+            identifiers={(DOMAIN, self._device_id)},
+            name=self._device_name,
             manufacturer="Siemens",
             model="S7 PLC",
         )
