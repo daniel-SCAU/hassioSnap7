@@ -64,11 +64,37 @@ class _UpdateFailed(Exception):
     pass
 
 
+class _FakeCoordinatorEntity:
+    """Stub CoordinatorEntity with minimal generic support."""
+
+    def __init__(self, coordinator, *args, **kwargs):
+        self.coordinator = coordinator
+
+    def __class_getitem__(cls, item):
+        return cls
+
+
 ha_coord.DataUpdateCoordinator = _FakeCoordinator  # type: ignore[attr-defined]
 ha_coord.UpdateFailed = _UpdateFailed  # type: ignore[attr-defined]
+ha_coord.CoordinatorEntity = _FakeCoordinatorEntity  # type: ignore[attr-defined]
 
 ha_entity = sys.modules["homeassistant.helpers.entity"]
 ha_entity.DeviceInfo = dict  # type: ignore[attr-defined]
+
+ha_entity_platform = sys.modules["homeassistant.helpers.entity_platform"]
+ha_entity_platform.AddEntitiesCallback = object  # type: ignore[attr-defined]
+
+ha_sensor = sys.modules["homeassistant.components.sensor"]
+ha_sensor.SensorEntity = object  # type: ignore[attr-defined]
+
+ha_binary_sensor = sys.modules["homeassistant.components.binary_sensor"]
+ha_binary_sensor.BinarySensorEntity = object  # type: ignore[attr-defined]
+
+ha_switch = sys.modules["homeassistant.components.switch"]
+ha_switch.SwitchEntity = object  # type: ignore[attr-defined]
+
+ha_number = sys.modules["homeassistant.components.number"]
+ha_number.NumberEntity = object  # type: ignore[attr-defined]
 
 # ---------------------------------------------------------------------------
 # snap7 stubs – replaced per-test with unittest.mock when behaviour matters

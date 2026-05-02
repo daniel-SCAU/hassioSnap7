@@ -8,7 +8,15 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DATA_TYPE_BOOL, DOMAIN
+from .const import (
+    CONF_PLC_IP,
+    CONF_RACK,
+    CONF_SLOT,
+    DATA_TYPE_BOOL,
+    DEFAULT_RACK,
+    DEFAULT_SLOT,
+    DOMAIN,
+)
 from .coordinator import Snap7Coordinator
 
 
@@ -20,7 +28,7 @@ async def async_setup_entry(
     """Set up Snap7 binary sensor entities."""
     coordinator: Snap7Coordinator = hass.data[DOMAIN][entry.entry_id]
     entities = [
-        Snap7BinarySensor(coordinator, tag, entry.entry_id)
+        Snap7BinarySensor(coordinator, tag, entry)
         for tag in coordinator.tags
         if tag["data_type"] == DATA_TYPE_BOOL and not tag.get("writable", False)
     ]
@@ -37,12 +45,17 @@ class Snap7BinarySensor(CoordinatorEntity[Snap7Coordinator], BinarySensorEntity)
         """Return False so HA never prepends the device name to friendly_name."""
         return False
 
-    def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry_id: str) -> None:
+    def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
         self._tag = tag
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_{tag['id']}"
-        self._attr_name = tag["name"]
+        self._device_id = (
+            f"{entry.data[CONF_PLC_IP]}:"
+            f"{entry.data.get(CONF_RACK, DEFAULT_RACK)}:"
+            f"{entry.data.get(CONF_SLOT, DEFAULT_SLOT)}"
+        )
+        self._device_name = entry.title
+        self._attr_unique_id = f"{self._device_id}_{tag['id']}"
+        self._attr_name = tag["name"].strip()
 
     @property
     def is_on(self) -> bool | None:
@@ -63,7 +76,8 @@ class Snap7BinarySensor(CoordinatorEntity[Snap7Coordinator], BinarySensorEntity)
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self._entry_id)},
+            identifiers={(DOMAIN, self._device_id)},
+            name=self._device_name,
             manufacturer="Siemens",
             model="S7 PLC",
         )
