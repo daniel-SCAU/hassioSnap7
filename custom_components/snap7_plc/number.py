@@ -14,7 +14,10 @@ from .const import (
     CONF_PLC_IP,
     CONF_RACK,
     CONF_SLOT,
+    DATA_TYPE_DINT,
     DATA_TYPE_INPUT_NUMBER,
+    DATA_TYPE_INT,
+    DATA_TYPE_REAL,
     DEFAULT_RACK,
     DEFAULT_SLOT,
     DOMAIN,
@@ -33,23 +36,23 @@ async def async_setup_entry(
         Snap7Number(coordinator, tag, entry)
         for tag in coordinator.tags
         if tag["data_type"] == DATA_TYPE_INPUT_NUMBER
+        or (
+            tag["data_type"] in (DATA_TYPE_INT, DATA_TYPE_DINT, DATA_TYPE_REAL)
+            and tag.get("writable", False)
+        )
     ]
     async_add_entities(entities)
 
 
 class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
-    """A writable number entity that reads and writes a real value on the PLC."""
+    """A writable number entity that reads and writes a numeric value on the PLC."""
 
     _attr_has_entity_name = False
-    _attr_native_min_value = -1000000.0
 
     @property
     def has_entity_name(self) -> bool:
         """Return False so HA never prepends the device name to friendly_name."""
         return False
-
-    _attr_native_max_value = 1000000.0
-    _attr_native_step = 1.0
 
     def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -65,6 +68,19 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
         unit = tag.get("unit", "")
         if unit:
             self._attr_native_unit_of_measurement = unit
+        data_type = tag.get("data_type", DATA_TYPE_INPUT_NUMBER)
+        if data_type == DATA_TYPE_INT:
+            self._attr_native_min_value = -32768.0
+            self._attr_native_max_value = 32767.0
+            self._attr_native_step = 1.0
+        elif data_type == DATA_TYPE_DINT:
+            self._attr_native_min_value = -2147483648.0
+            self._attr_native_max_value = 2147483647.0
+            self._attr_native_step = 1.0
+        else:
+            self._attr_native_min_value = -1000000.0
+            self._attr_native_max_value = 1000000.0
+            self._attr_native_step = 1.0
 
     @property
     def native_value(self) -> float | None:

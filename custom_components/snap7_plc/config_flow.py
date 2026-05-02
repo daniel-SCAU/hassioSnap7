@@ -18,7 +18,10 @@ from .const import (
     CONF_SLOT,
     CONF_TAGS,
     DATA_TYPE_BOOL,
+    DATA_TYPE_DINT,
     DATA_TYPE_INPUT_NUMBER,
+    DATA_TYPE_INT,
+    DATA_TYPE_REAL,
     DATA_TYPES,
     DEFAULT_LIBRARY,
     DEFAULT_RACK,
@@ -230,8 +233,15 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             except ValueError:
                 errors["address"] = "invalid_address"
             else:
-                if user_input.get("writable") and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER):
-                    errors["writable"] = "only_bool_writable"
+                _WRITABLE_TYPES = (
+                    DATA_TYPE_BOOL,
+                    DATA_TYPE_INPUT_NUMBER,
+                    DATA_TYPE_INT,
+                    DATA_TYPE_DINT,
+                    DATA_TYPE_REAL,
+                )
+                if user_input.get("writable") and parsed["data_type"] not in _WRITABLE_TYPES:
+                    errors["writable"] = "only_numeric_writable"
                 else:
                     # input_number is always writable regardless of the checkbox
                     is_writable = (

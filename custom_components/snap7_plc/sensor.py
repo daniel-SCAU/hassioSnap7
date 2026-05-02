@@ -13,7 +13,10 @@ from .const import (
     CONF_RACK,
     CONF_SLOT,
     DATA_TYPE_BOOL,
+    DATA_TYPE_DINT,
     DATA_TYPE_INPUT_NUMBER,
+    DATA_TYPE_INT,
+    DATA_TYPE_REAL,
     DEFAULT_RACK,
     DEFAULT_SLOT,
     DOMAIN,
@@ -32,6 +35,10 @@ async def async_setup_entry(
         Snap7Sensor(coordinator, tag, entry)
         for tag in coordinator.tags
         if tag["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
+        and not (
+            tag["data_type"] in (DATA_TYPE_INT, DATA_TYPE_DINT, DATA_TYPE_REAL)
+            and tag.get("writable", False)
+        )
     ]
     async_add_entities(entities)
 

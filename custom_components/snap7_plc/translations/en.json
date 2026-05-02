@@ -47,13 +47,13 @@
       },
       "add_tag": {
         "title": "Add PLC Tag",
-        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`\n- Raw ASCII bytes (N bytes): `MB140(4)` or `DB1.DBB0(10)`\n\n**Note:** Only boolean (`bool`) tags may be marked as Writable.",
+        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`\n- Raw ASCII bytes (N bytes): `MB140(4)` or `DB1.DBB0(10)`\n\n**Note:** `input_number` always creates a writable Number entity. `int`, `dint`, and `real` tags can also be made writable (Number entity) by checking the Writable box. Only `bool` tags create a Switch entity when writable.",
         "data": {
           "name": "Tag Name",
           "address": "PLC Address",
           "data_type": "Data Type",
           "unit": "Unit of Measurement (optional)",
-          "writable": "Writable — creates a Switch entity (boolean tags only)"
+          "writable": "Writable — creates a Switch (bool) or Number entity (int / dint / real / input_number)"
         }
       },
       "remove_tag": {
@@ -73,7 +73,7 @@
     },
     "error": {
       "invalid_address": "Invalid PLC address format. See the description above for supported formats.",
-      "only_bool_writable": "Only boolean (bool) tags can be marked as Writable. Remove the Writable flag or choose a boolean address."
+      "only_numeric_writable": "Only bool, int, dint, real, and input_number tags can be marked as Writable. Remove the Writable flag or choose a supported data type."
     }
   }
 }
