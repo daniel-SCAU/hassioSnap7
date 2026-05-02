@@ -111,13 +111,17 @@ def parse_address(address: str, data_type: str) -> dict:
 
     m = re.match(r"^DB(\d+)\.DBW(\d+)$", addr)
     if m:
-        valid = [DATA_TYPE_WORD, DATA_TYPE_INT]
+        valid = [DATA_TYPE_WORD, DATA_TYPE_INT, DATA_TYPE_INPUT_NUMBER]
+        resolved = data_type if data_type in valid else DATA_TYPE_WORD
+        # input_number on a 16-bit address behaves as int
+        if resolved == DATA_TYPE_INPUT_NUMBER:
+            resolved = DATA_TYPE_INT
         return {
             "area": AREA_DB,
             "db": int(m.group(1)),
             "byte": int(m.group(2)),
             "bit": 0,
-            "data_type": data_type if data_type in valid else DATA_TYPE_WORD,
+            "data_type": resolved,
         }
 
     m = re.match(r"^DB(\d+)\.DBD(\d+)$", addr)
@@ -173,13 +177,17 @@ def parse_address(address: str, data_type: str) -> dict:
 
     m = re.match(r"^MW(\d+)$", addr)
     if m:
-        valid = [DATA_TYPE_WORD, DATA_TYPE_INT]
+        valid = [DATA_TYPE_WORD, DATA_TYPE_INT, DATA_TYPE_INPUT_NUMBER]
+        resolved = data_type if data_type in valid else DATA_TYPE_WORD
+        # input_number on a 16-bit address behaves as int
+        if resolved == DATA_TYPE_INPUT_NUMBER:
+            resolved = DATA_TYPE_INT
         return {
             "area": AREA_M,
             "db": 0,
             "byte": int(m.group(1)),
             "bit": 0,
-            "data_type": data_type if data_type in valid else DATA_TYPE_WORD,
+            "data_type": resolved,
         }
 
     m = re.match(r"^MD(\d+)$", addr)
