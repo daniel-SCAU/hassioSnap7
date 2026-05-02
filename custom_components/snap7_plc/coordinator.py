@@ -36,6 +36,17 @@ _LOGGER = logging.getLogger(__name__)
 # Address parser
 # ---------------------------------------------------------------------------
 
+def _resolve_word_data_type(data_type: str) -> str:
+    """Return the effective data type for a 16-bit (word) address.
+
+    ``input_number`` is coerced to ``int`` because a Word address holds only
+    2 bytes and the signed integer representation matches user intent.
+    """
+    if data_type in (DATA_TYPE_WORD, DATA_TYPE_INT, DATA_TYPE_INPUT_NUMBER):
+        return DATA_TYPE_INT if data_type == DATA_TYPE_INPUT_NUMBER else data_type
+    return DATA_TYPE_WORD
+
+
 def parse_address(address: str, data_type: str) -> dict:
     """Parse a PLC address string into a structured dict.
 
@@ -111,17 +122,12 @@ def parse_address(address: str, data_type: str) -> dict:
 
     m = re.match(r"^DB(\d+)\.DBW(\d+)$", addr)
     if m:
-        valid = [DATA_TYPE_WORD, DATA_TYPE_INT, DATA_TYPE_INPUT_NUMBER]
-        resolved = data_type if data_type in valid else DATA_TYPE_WORD
-        # input_number on a 16-bit address behaves as int
-        if resolved == DATA_TYPE_INPUT_NUMBER:
-            resolved = DATA_TYPE_INT
         return {
             "area": AREA_DB,
             "db": int(m.group(1)),
             "byte": int(m.group(2)),
             "bit": 0,
-            "data_type": resolved,
+            "data_type": _resolve_word_data_type(data_type),
         }
 
     m = re.match(r"^DB(\d+)\.DBD(\d+)$", addr)
@@ -177,17 +183,12 @@ def parse_address(address: str, data_type: str) -> dict:
 
     m = re.match(r"^MW(\d+)$", addr)
     if m:
-        valid = [DATA_TYPE_WORD, DATA_TYPE_INT, DATA_TYPE_INPUT_NUMBER]
-        resolved = data_type if data_type in valid else DATA_TYPE_WORD
-        # input_number on a 16-bit address behaves as int
-        if resolved == DATA_TYPE_INPUT_NUMBER:
-            resolved = DATA_TYPE_INT
         return {
             "area": AREA_M,
             "db": 0,
             "byte": int(m.group(1)),
             "bit": 0,
-            "data_type": resolved,
+            "data_type": _resolve_word_data_type(data_type),
         }
 
     m = re.match(r"^MD(\d+)$", addr)
