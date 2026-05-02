@@ -537,7 +537,9 @@ class TestScanInterval:
 # ---------------------------------------------------------------------------
 
 class TestWritableValidation:
-    """The writable=True flag is valid for boolean and input_number tags."""
+    """The writable=True flag is valid for boolean, input_number, int, dint, and real tags."""
+
+    _WRITABLE_TYPES = (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER, DATA_TYPE_INT, DATA_TYPE_DINT, DATA_TYPE_REAL)
 
     def test_non_bool_writable_raises_in_config_logic(self):
         """Simulate the config flow validation check for a non-writable type."""
@@ -548,8 +550,8 @@ class TestWritableValidation:
         writable = True
 
         parsed = parse_address(address, data_type)
-        is_error = writable and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
-        assert is_error, "Expected validation error for non-bool/non-input_number writable tag"
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
+        assert is_error, "Expected validation error for non-writable type (word)"
 
     def test_bool_writable_is_valid(self):
         address = "DB1.DBX0.0"
@@ -557,7 +559,7 @@ class TestWritableValidation:
         writable = True
 
         parsed = parse_address(address, data_type)
-        is_error = writable and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
         assert not is_error
 
     def test_input_number_writable_is_valid(self):
@@ -566,7 +568,31 @@ class TestWritableValidation:
         writable = True
 
         parsed = parse_address(address, data_type)
-        is_error = writable and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
+        assert not is_error
+
+    def test_int_writable_is_valid(self):
+        address = "DB1.DBW0"
+        writable = True
+
+        parsed = parse_address(address, DATA_TYPE_INT)
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
+        assert not is_error
+
+    def test_dint_writable_is_valid(self):
+        address = "DB1.DBD0"
+        writable = True
+
+        parsed = parse_address(address, DATA_TYPE_DINT)
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
+        assert not is_error
+
+    def test_real_writable_is_valid(self):
+        address = "DB1.DBD0"
+        writable = True
+
+        parsed = parse_address(address, DATA_TYPE_REAL)
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
         assert not is_error
 
     def test_non_bool_not_writable_is_valid(self):
@@ -577,7 +603,7 @@ class TestWritableValidation:
         writable = False
 
         parsed = parse_address(address, data_type)
-        is_error = writable and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
+        is_error = writable and parsed["data_type"] not in self._WRITABLE_TYPES
         assert not is_error
 
 
@@ -686,4 +712,139 @@ class TestFormatPlcDate:
     def test_too_short_returns_invalid(self):
         """Values with fewer than 6 digits cannot encode a valid date."""
         assert _format_plc_date(12345) == "Invalid date: 12345"
+
+
+# ---------------------------------------------------------------------------
+# Writable int/dint/real → number entity routing
+# ---------------------------------------------------------------------------
+
+class TestWritableNumericEntityRouting:
+    """Writable int/dint/real tags must become number entities, not sensors."""
+
+    def _is_number_entity(self, tag):
+        """Mirror the number.py entity inclusion logic."""
+        return (
+            tag["data_type"] == DATA_TYPE_INPUT_NUMBER
+            or (
+                tag["data_type"] in (DATA_TYPE_INT, DATA_TYPE_DINT, DATA_TYPE_REAL)
+                and tag.get("writable", False)
+            )
+        )
+
+    def _is_sensor_entity(self, tag):
+        """Mirror the sensor.py entity inclusion logic."""
+        return (
+            tag["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER)
+            and not (
+                tag["data_type"] in (DATA_TYPE_INT, DATA_TYPE_DINT, DATA_TYPE_REAL)
+                and tag.get("writable", False)
+            )
+        )
+
+    def test_writable_int_is_number_not_sensor(self):
+        tag = {"data_type": DATA_TYPE_INT, "writable": True}
+        assert self._is_number_entity(tag)
+        assert not self._is_sensor_entity(tag)
+
+    def test_writable_dint_is_number_not_sensor(self):
+        tag = {"data_type": DATA_TYPE_DINT, "writable": True}
+        assert self._is_number_entity(tag)
+        assert not self._is_sensor_entity(tag)
+
+    def test_writable_real_is_number_not_sensor(self):
+        tag = {"data_type": DATA_TYPE_REAL, "writable": True}
+        assert self._is_number_entity(tag)
+        assert not self._is_sensor_entity(tag)
+
+    def test_readonly_int_is_sensor_not_number(self):
+        tag = {"data_type": DATA_TYPE_INT, "writable": False}
+        assert not self._is_number_entity(tag)
+        assert self._is_sensor_entity(tag)
+
+    def test_readonly_dint_is_sensor_not_number(self):
+        tag = {"data_type": DATA_TYPE_DINT, "writable": False}
+        assert not self._is_number_entity(tag)
+        assert self._is_sensor_entity(tag)
+
+    def test_readonly_real_is_sensor_not_number(self):
+        tag = {"data_type": DATA_TYPE_REAL, "writable": False}
+        assert not self._is_number_entity(tag)
+        assert self._is_sensor_entity(tag)
+
+    def test_input_number_is_always_number(self):
+        tag = {"data_type": DATA_TYPE_INPUT_NUMBER, "writable": False}
+        assert self._is_number_entity(tag)
+        assert not self._is_sensor_entity(tag)
+
+
+# ---------------------------------------------------------------------------
+# Snap7Number min/max/step per data type
+# ---------------------------------------------------------------------------
+
+class TestSnapNumberConstraints:
+    """Number entity constraints must match PLC data type range."""
+
+    def _make_number(self, data_type):
+        from custom_components.snap7_plc.number import Snap7Number
+        from types import SimpleNamespace
+        coord = SimpleNamespace(data={})
+        tag = {
+            "id": "t1",
+            "name": "Test",
+            "address": "DB1.DBD0",
+            "data_type": data_type,
+            "unit": "",
+        }
+        if data_type == DATA_TYPE_INT:
+            tag["address"] = "DB1.DBW0"
+        entry = SimpleNamespace(
+            data={"plc_ip": "192.168.1.1", "rack": 0, "slot": 1},
+            title="PLC",
+        )
+        return Snap7Number(coord, tag, entry)
+
+    def test_int_range(self):
+        num = self._make_number(DATA_TYPE_INT)
+        assert num._attr_native_min_value == -32768.0
+        assert num._attr_native_max_value == 32767.0
+        assert num._attr_native_step == 1.0
+
+    def test_dint_range(self):
+        num = self._make_number(DATA_TYPE_DINT)
+        assert num._attr_native_min_value == -2147483648.0
+        assert num._attr_native_max_value == 2147483647.0
+        assert num._attr_native_step == 1.0
+
+    def test_real_keeps_default_range(self):
+        num = self._make_number(DATA_TYPE_REAL)
+        assert num._attr_native_min_value == -1000000.0
+        assert num._attr_native_max_value == 1000000.0
+
+    def test_input_number_keeps_default_range(self):
+        num = self._make_number(DATA_TYPE_INPUT_NUMBER)
+        assert num._attr_native_min_value == -1000000.0
+        assert num._attr_native_max_value == 1000000.0
+
+
+# ---------------------------------------------------------------------------
+# Write round-trip for writable int/dint via coordinator
+# ---------------------------------------------------------------------------
+
+class TestWritableIntDintWrite:
+    """Writable int and dint tags write correctly through the coordinator."""
+
+    def test_writable_int_write(self):
+        tag = {"id": "t1", "name": "IntTag", "address": "DB1.DBW0", "data_type": DATA_TYPE_INT}
+        coord = _make_write_coordinator(tag)
+        coord._write_value("t1", 100)  # must not raise
+
+    def test_writable_dint_write(self):
+        tag = {"id": "t1", "name": "DintTag", "address": "DB1.DBD0", "data_type": DATA_TYPE_DINT}
+        coord = _make_write_coordinator(tag)
+        coord._write_value("t1", 100000)  # must not raise
+
+    def test_writable_real_write(self):
+        tag = {"id": "t1", "name": "RealTag", "address": "DB1.DBD0", "data_type": DATA_TYPE_REAL}
+        coord = _make_write_coordinator(tag)
+        coord._write_value("t1", 3.14)  # must not raise
 
