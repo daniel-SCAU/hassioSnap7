@@ -18,6 +18,7 @@ from .const import (
     CONF_SLOT,
     CONF_TAGS,
     DATA_TYPE_BOOL,
+    DATA_TYPE_INPUT_NUMBER,
     DATA_TYPES,
     DEFAULT_LIBRARY,
     DEFAULT_RACK,
@@ -229,16 +230,22 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             except ValueError:
                 errors["address"] = "invalid_address"
             else:
-                if user_input.get("writable") and parsed["data_type"] != DATA_TYPE_BOOL:
+                if user_input.get("writable") and parsed["data_type"] not in (DATA_TYPE_BOOL, DATA_TYPE_INPUT_NUMBER):
                     errors["writable"] = "only_bool_writable"
                 else:
+                    # input_number is always writable regardless of the checkbox
+                    is_writable = (
+                        True
+                        if parsed["data_type"] == DATA_TYPE_INPUT_NUMBER
+                        else user_input.get("writable", False)
+                    )
                     tag: dict[str, Any] = {
                         "id": str(uuid.uuid4()),
                         "name": user_input["name"].strip(),
                         "address": address,
                         "data_type": parsed["data_type"],
                         "unit": user_input.get("unit", ""),
-                        "writable": user_input.get("writable", False),
+                        "writable": is_writable,
                     }
                     self._tags.append(tag)
                     return await self.async_step_menu()
