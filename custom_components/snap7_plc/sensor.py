@@ -32,6 +32,11 @@ class Snap7Sensor(CoordinatorEntity[Snap7Coordinator], SensorEntity):
 
     _attr_has_entity_name = False
 
+    @property
+    def has_entity_name(self) -> bool:
+        """Return False so HA never prepends the device name to friendly_name."""
+        return False
+
     def __init__(self, coordinator: Snap7Coordinator, tag: dict, entry_id: str) -> None:
         super().__init__(coordinator)
         self._tag = tag

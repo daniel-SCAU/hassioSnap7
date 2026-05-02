@@ -34,6 +34,12 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
 
     _attr_has_entity_name = False
     _attr_native_min_value = -1000000.0
+
+    @property
+    def has_entity_name(self) -> bool:
+        """Return False so HA never prepends the device name to friendly_name."""
+        return False
+
     _attr_native_max_value = 1000000.0
     _attr_native_step = 1.0
 
