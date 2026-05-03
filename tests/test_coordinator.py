@@ -899,7 +899,7 @@ class TestNumericDisplayTyping:
         assert entity.native_value == 3.14
         assert isinstance(entity.native_value, float)
 
-    def test_input_number_dbd_native_value_uses_integer_when_parsed_as_dint(self):
+    def test_legacy_input_number_returns_int_native_value(self):
         from custom_components.snap7_plc.number import Snap7Number
         from types import SimpleNamespace
 

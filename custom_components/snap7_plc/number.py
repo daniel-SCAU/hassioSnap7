@@ -105,6 +105,7 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
             return None
         if self._effective_data_type() in self._INTEGER_TYPES:
             return str(int(value))
+        # Keep Home Assistant's default state rendering for non-integer values.
         return super().state
 
     def _effective_data_type(self) -> str | None:
