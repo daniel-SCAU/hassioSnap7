@@ -93,9 +93,27 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
         value = self.coordinator.data.get(self._tag["id"])
         if value is None:
             return None
-        if self._tag.get("data_type") in self._INTEGER_TYPES:
+        if self._effective_data_type() in self._INTEGER_TYPES:
             return int(value)
         return float(value)
+
+    @property
+    def state(self) -> Any:
+        """Return an unformatted state for integer PLC data types."""
+        value = self.native_value
+        if value is None:
+            return None
+        if self._effective_data_type() in self._INTEGER_TYPES:
+            return str(int(value))
+        # Keep Home Assistant's default state rendering for non-integer values.
+        return super().state
+
+    def _effective_data_type(self) -> str | None:
+        """Return the parsed PLC data type for this tag when available."""
+        parsed_tags = getattr(self.coordinator, "_parsed_tags", {})
+        return parsed_tags.get(self._tag["id"], {}).get("data_type") or self._tag.get(
+            "data_type"
+        )
 
     async def async_set_native_value(self, value: float) -> None:
         """Write a new value to the PLC."""

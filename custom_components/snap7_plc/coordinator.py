@@ -47,6 +47,23 @@ def _resolve_word_data_type(data_type: str) -> str:
     return DATA_TYPE_WORD
 
 
+def _resolve_dword_data_type(data_type: str) -> str:
+    """Return the effective data type for a 32-bit (dword) address.
+
+    ``input_number`` is coerced to ``dint`` so writable legacy numeric tags
+    on ``MD``/``DBD`` addresses are treated as signed integers.
+    """
+    if data_type in (
+        DATA_TYPE_DWORD,
+        DATA_TYPE_DINT,
+        DATA_TYPE_REAL,
+        DATA_TYPE_INPUT_NUMBER,
+        DATA_TYPE_DATE,
+    ):
+        return DATA_TYPE_DINT if data_type == DATA_TYPE_INPUT_NUMBER else data_type
+    return DATA_TYPE_DWORD
+
+
 def parse_address(address: str, data_type: str) -> dict:
     """Parse a PLC address string into a structured dict.
 
@@ -132,13 +149,12 @@ def parse_address(address: str, data_type: str) -> dict:
 
     m = re.match(r"^DB(\d+)\.DBD(\d+)$", addr)
     if m:
-        valid = [DATA_TYPE_DWORD, DATA_TYPE_DINT, DATA_TYPE_REAL, DATA_TYPE_INPUT_NUMBER, DATA_TYPE_DATE]
         return {
             "area": AREA_DB,
             "db": int(m.group(1)),
             "byte": int(m.group(2)),
             "bit": 0,
-            "data_type": data_type if data_type in valid else DATA_TYPE_DWORD,
+            "data_type": _resolve_dword_data_type(data_type),
         }
 
     # ── M area ─────────────────────────────────────────────────────────────
@@ -193,13 +209,12 @@ def parse_address(address: str, data_type: str) -> dict:
 
     m = re.match(r"^MD(\d+)$", addr)
     if m:
-        valid = [DATA_TYPE_DWORD, DATA_TYPE_DINT, DATA_TYPE_REAL, DATA_TYPE_INPUT_NUMBER, DATA_TYPE_DATE]
         return {
             "area": AREA_M,
             "db": 0,
             "byte": int(m.group(1)),
             "bit": 0,
-            "data_type": data_type if data_type in valid else DATA_TYPE_DWORD,
+            "data_type": _resolve_dword_data_type(data_type),
         }
 
     raise ValueError(f"Unrecognised PLC address format: '{address}'")
@@ -414,6 +429,10 @@ class Snap7Coordinator(DataUpdateCoordinator):
                         )
                     set_dword(raw, 0, v)
                 elif data_type == DATA_TYPE_DINT:
+                    if not math.isfinite(float(value)):
+                        raise ValueError(
+                            f"DINT value {value!r} is not a finite number"
+                        )
                     v = int(value)
                     if not -2147483648 <= v <= 2147483647:
                         raise ValueError(
