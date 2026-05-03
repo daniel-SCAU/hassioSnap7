@@ -12,14 +12,11 @@ from .const import (
     CONF_PLC_IP,
     CONF_RACK,
     CONF_SLOT,
-    DATA_TYPE_BYTE,
     DATA_TYPE_BOOL,
     DATA_TYPE_DINT,
-    DATA_TYPE_DWORD,
     DATA_TYPE_INPUT_NUMBER,
     DATA_TYPE_INT,
     DATA_TYPE_REAL,
-    DATA_TYPE_WORD,
     DEFAULT_RACK,
     DEFAULT_SLOT,
     DOMAIN,
@@ -50,13 +47,6 @@ class Snap7Sensor(CoordinatorEntity[Snap7Coordinator], SensorEntity):
     """A sensor entity that reads a numeric value from the PLC."""
 
     _attr_has_entity_name = False
-    _INTEGER_TYPES = {
-        DATA_TYPE_BYTE,
-        DATA_TYPE_WORD,
-        DATA_TYPE_INT,
-        DATA_TYPE_DWORD,
-        DATA_TYPE_DINT,
-    }
 
     @property
     def has_entity_name(self) -> bool:
@@ -83,12 +73,7 @@ class Snap7Sensor(CoordinatorEntity[Snap7Coordinator], SensorEntity):
         """Return the current tag value."""
         if self.coordinator.data is None:
             return None
-        value = self.coordinator.data.get(self._tag["id"])
-        if value is None:
-            return None
-        if self._tag.get("data_type") in self._INTEGER_TYPES:
-            return int(value)
-        return value
+        return self.coordinator.data.get(self._tag["id"])
 
     @property
     def extra_state_attributes(self) -> dict:

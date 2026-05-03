@@ -48,9 +48,6 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
     """A writable number entity that reads and writes a numeric value on the PLC."""
 
     _attr_has_entity_name = False
-    # Writable number entities are created only for INT/DINT/REAL (plus input_number).
-    # INT and DINT must be exposed as whole numbers in Home Assistant.
-    _INTEGER_TYPES = {DATA_TYPE_INT, DATA_TYPE_DINT}
 
     @property
     def has_entity_name(self) -> bool:
@@ -86,16 +83,12 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
             self._attr_native_step = 1.0
 
     @property
-    def native_value(self) -> int | float | None:
+    def native_value(self) -> float | None:
         """Return the current tag value."""
         if self.coordinator.data is None:
             return None
         value = self.coordinator.data.get(self._tag["id"])
-        if value is None:
-            return None
-        if self._tag.get("data_type") in self._INTEGER_TYPES:
-            return int(value)
-        return float(value)
+        return float(value) if value is not None else None
 
     async def async_set_native_value(self, value: float) -> None:
         """Write a new value to the PLC."""
