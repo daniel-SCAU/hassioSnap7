@@ -93,7 +93,13 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
         value = self.coordinator.data.get(self._tag["id"])
         if value is None:
             return None
-        if self._tag.get("data_type") in self._INTEGER_TYPES:
+        parsed_tags = getattr(self.coordinator, "_parsed_tags", {})
+        effective_data_type = (
+            parsed_tags.get(self._tag["id"], {}).get("data_type")
+            if isinstance(parsed_tags, dict)
+            else None
+        )
+        if (effective_data_type or self._tag.get("data_type")) in self._INTEGER_TYPES:
             return int(value)
         return float(value)
 

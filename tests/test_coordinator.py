@@ -655,12 +655,12 @@ class TestInputNumberAddressParsing:
     def test_db_dbd_input_number(self):
         result = parse_address("DB1.DBD0", DATA_TYPE_INPUT_NUMBER)
         assert result["area"] == AREA_DB
-        assert result["data_type"] == DATA_TYPE_INPUT_NUMBER
+        assert result["data_type"] == DATA_TYPE_DINT
 
     def test_m_md_input_number(self):
         result = parse_address("MD4", DATA_TYPE_INPUT_NUMBER)
         assert result["area"] == AREA_M
-        assert result["data_type"] == DATA_TYPE_INPUT_NUMBER
+        assert result["data_type"] == DATA_TYPE_DINT
 
     def test_input_number_data_size_is_4(self):
         from custom_components.snap7_plc.coordinator import _data_size
@@ -898,6 +898,21 @@ class TestNumericDisplayTyping:
 
         assert entity.native_value == 3.14
         assert isinstance(entity.native_value, float)
+
+    def test_input_number_dbd_native_value_uses_integer_when_parsed_as_dint(self):
+        from custom_components.snap7_plc.number import Snap7Number
+        from types import SimpleNamespace
+
+        coord = SimpleNamespace(
+            data={"t1": 320598765},
+            _parsed_tags={"t1": {"data_type": DATA_TYPE_DINT}},
+        )
+        tag = {"id": "t1", "name": "LegacyInputNumber", "address": "MD100", "data_type": DATA_TYPE_INPUT_NUMBER}
+        entry = SimpleNamespace(data={"plc_ip": "192.168.1.1", "rack": 0, "slot": 1}, title="PLC")
+        entity = Snap7Number(coord, tag, entry)
+
+        assert entity.native_value == 320598765
+        assert isinstance(entity.native_value, int)
 
 
 # ---------------------------------------------------------------------------
