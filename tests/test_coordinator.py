@@ -847,6 +847,60 @@ class TestSnapNumberConstraints:
 
 
 # ---------------------------------------------------------------------------
+# Integer vs float display typing
+# ---------------------------------------------------------------------------
+
+class TestNumericDisplayTyping:
+    def test_writable_int_native_value_is_integer(self):
+        from custom_components.snap7_plc.number import Snap7Number
+        from types import SimpleNamespace
+
+        coord = SimpleNamespace(data={"t1": 12.0})
+        tag = {"id": "t1", "name": "WritableInt", "address": "DB1.DBW0", "data_type": DATA_TYPE_INT}
+        entry = SimpleNamespace(data={"plc_ip": "192.168.1.1", "rack": 0, "slot": 1}, title="PLC")
+        entity = Snap7Number(coord, tag, entry)
+
+        assert entity.native_value == 12
+        assert isinstance(entity.native_value, int)
+
+    def test_writable_dint_native_value_is_integer(self):
+        from custom_components.snap7_plc.number import Snap7Number
+        from types import SimpleNamespace
+
+        coord = SimpleNamespace(data={"t1": -25.0})
+        tag = {"id": "t1", "name": "WritableDint", "address": "DB1.DBD0", "data_type": DATA_TYPE_DINT}
+        entry = SimpleNamespace(data={"plc_ip": "192.168.1.1", "rack": 0, "slot": 1}, title="PLC")
+        entity = Snap7Number(coord, tag, entry)
+
+        assert entity.native_value == -25
+        assert isinstance(entity.native_value, int)
+
+    def test_readonly_word_sensor_native_value_is_integer(self):
+        from custom_components.snap7_plc.sensor import Snap7Sensor
+        from types import SimpleNamespace
+
+        coord = SimpleNamespace(data={"t1": 33.0})
+        tag = {"id": "t1", "name": "WordTag", "address": "DB1.DBW0", "data_type": DATA_TYPE_WORD}
+        entry = SimpleNamespace(data={"plc_ip": "192.168.1.1", "rack": 0, "slot": 1}, title="PLC")
+        entity = Snap7Sensor(coord, tag, entry)
+
+        assert entity.native_value == 33
+        assert isinstance(entity.native_value, int)
+
+    def test_real_native_value_keeps_float(self):
+        from custom_components.snap7_plc.number import Snap7Number
+        from types import SimpleNamespace
+
+        coord = SimpleNamespace(data={"t1": 3.14})
+        tag = {"id": "t1", "name": "WritableReal", "address": "DB1.DBD0", "data_type": DATA_TYPE_REAL}
+        entry = SimpleNamespace(data={"plc_ip": "192.168.1.1", "rack": 0, "slot": 1}, title="PLC")
+        entity = Snap7Number(coord, tag, entry)
+
+        assert entity.native_value == 3.14
+        assert isinstance(entity.native_value, float)
+
+
+# ---------------------------------------------------------------------------
 # Write round-trip for writable int/dint via coordinator
 # ---------------------------------------------------------------------------
 
@@ -867,4 +921,3 @@ class TestWritableIntDintWrite:
         tag = {"id": "t1", "name": "RealTag", "address": "DB1.DBD0", "data_type": DATA_TYPE_REAL}
         coord = _make_write_coordinator(tag)
         coord._write_value("t1", 3.14)  # must not raise
-
