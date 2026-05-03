@@ -431,7 +431,7 @@ class Snap7Coordinator(DataUpdateCoordinator):
                 elif data_type == DATA_TYPE_DINT:
                     if not math.isfinite(float(value)):
                         raise ValueError(
-                            f"DInt value {value!r} is not a finite number"
+                            f"DINT value {value!r} is not a finite number"
                         )
                     v = int(value)
                     if not -2147483648 <= v <= 2147483647:
