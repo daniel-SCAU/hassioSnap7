@@ -914,6 +914,28 @@ class TestNumericDisplayTyping:
         assert entity.native_value == 320598765
         assert isinstance(entity.native_value, int)
 
+    def test_writable_dint_state_string_is_plain_digits(self):
+        from custom_components.snap7_plc.number import Snap7Number
+        from types import SimpleNamespace
+
+        coord = SimpleNamespace(data={"t1": 12345678})
+        tag = {"id": "t1", "name": "WritableDint", "address": "DB1.DBD0", "data_type": DATA_TYPE_DINT}
+        entry = SimpleNamespace(data={"plc_ip": "192.168.1.1", "rack": 0, "slot": 1}, title="PLC")
+        entity = Snap7Number(coord, tag, entry)
+
+        assert entity.state == "12345678"
+
+    def test_writable_int_state_string_is_plain_digits(self):
+        from custom_components.snap7_plc.number import Snap7Number
+        from types import SimpleNamespace
+
+        coord = SimpleNamespace(data={"t1": 32767})
+        tag = {"id": "t1", "name": "WritableInt", "address": "DB1.DBW0", "data_type": DATA_TYPE_INT}
+        entry = SimpleNamespace(data={"plc_ip": "192.168.1.1", "rack": 0, "slot": 1}, title="PLC")
+        entity = Snap7Number(coord, tag, entry)
+
+        assert entity.state == "32767"
+
 
 # ---------------------------------------------------------------------------
 # Write round-trip for writable int/dint via coordinator
