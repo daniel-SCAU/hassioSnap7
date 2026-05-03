@@ -48,6 +48,8 @@ class Snap7Number(CoordinatorEntity[Snap7Coordinator], NumberEntity):
     """A writable number entity that reads and writes a numeric value on the PLC."""
 
     _attr_has_entity_name = False
+    # Writable number entities are created only for INT/DINT/REAL (plus input_number).
+    # INT and DINT must be exposed as whole numbers in Home Assistant.
     _INTEGER_TYPES = {DATA_TYPE_INT, DATA_TYPE_DINT}
 
     @property
