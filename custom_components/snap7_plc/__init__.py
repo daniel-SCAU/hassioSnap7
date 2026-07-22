@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_LIBRARY,
@@ -33,8 +34,39 @@ PLATFORMS: list[Platform] = [
 ]
 
 
+def _cleanup_orphaned_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove entity registry entries whose tag id no longer exists.
+
+    Each entity's unique_id is ``<device_id>_<tag_id>``.  Any entry that
+    belongs to this config entry and whose tag portion is not in the active
+    tag set is removed so deleted tags do not leave stale HA entities.
+    """
+    tags = entry.options.get(CONF_TAGS, [])
+    active_tag_ids = {tag["id"] for tag in tags}
+
+    plc_ip = entry.data[CONF_PLC_IP]
+    rack = entry.data.get(CONF_RACK, DEFAULT_RACK)
+    slot = entry.data.get(CONF_SLOT, DEFAULT_SLOT)
+    device_id = f"{plc_ip}:{rack}:{slot}"
+    prefix = f"{device_id}_"
+
+    ent_reg = er.async_get(hass)
+    for entity_entry in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        uid = entity_entry.unique_id or ""
+        if uid.startswith(prefix) and uid[len(prefix):] not in active_tag_ids:
+            _LOGGER.debug(
+                "Removing orphaned entity %s (unique_id=%s)",
+                entity_entry.entity_id,
+                uid,
+            )
+            ent_reg.async_remove(entity_entry.entity_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Snap7 PLC from a config entry."""
+    # Remove stale entities for tags that have been deleted since the last run.
+    _cleanup_orphaned_entities(hass, entry)
+
     tags = entry.options.get(CONF_TAGS, [])
     scan_interval = entry.options.get(
         CONF_SCAN_INTERVAL,

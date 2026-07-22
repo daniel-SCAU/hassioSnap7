@@ -60,8 +60,36 @@ Open the integration's **Configure** dialog (Settings → Devices & Services →
 
 - **Add a new tag** – fill in a name, PLC address, and data type.
 - **Remove existing tag(s)** – multi-select tags to delete.
+- **Import tags from YAML** – paste a YAML tag list to merge into existing tags.
+- **Export tags to YAML** – view the current tag list as copyable YAML.
 - **Update scan interval** – change the polling rate without reconfiguring.
 - **Save and close** – persist changes (triggers an integration reload).
+
+### YAML Import / Export
+
+Tags can be bulk-managed using YAML.  The expected format is:
+
+```yaml
+tags:
+  - id: <uuid>           # optional – generated if omitted
+    name: Temperature
+    address: DB1.DBD0
+    data_type: real
+    unit: "°C"
+    writable: false
+```
+
+A top-level list (without the `tags:` key) is also accepted.
+
+**Import (merge) behavior:**
+- Matching uses `id` first, then `(name, address)` as a fallback key.
+- Matched tags are updated with the imported fields.
+- Unmatched imported tags are appended as new tags.
+- Existing tags not referenced by the import are kept unchanged.
+- Invalid YAML or invalid tag fields show a clear error and keep you on the import screen.
+
+**Deleted tag cleanup:**
+When tags are removed (via the *Remove* step or by importing a revised list and then saving), their corresponding Home Assistant entities are removed from the entity registry on the next integration reload so no stale entities remain.
 
 ### Supported Address Formats
 
