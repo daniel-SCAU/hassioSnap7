@@ -30,6 +30,8 @@ DEFAULT_LIBRARY = LIBRARY_SNAP7
 # PLC memory areas
 AREA_M = "M"
 AREA_DB = "DB"
+AREA_I = "I"
+AREA_Q = "Q"
 
 # Data types
 DATA_TYPE_BOOL = "bool"

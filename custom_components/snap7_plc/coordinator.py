@@ -14,7 +14,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .backends import PlcBackend, create_backend
 from .const import (
     AREA_DB,
+    AREA_I,
     AREA_M,
+    AREA_Q,
     DATA_TYPE_BOOL,
     DATA_TYPE_BYTE,
     DATA_TYPE_DATE,
@@ -82,6 +84,18 @@ def parse_address(address: str, data_type: str) -> dict:
       - Word/Int : ``DB<n>.DBW<byte>``                e.g. ``DB1.DBW4``
       - DWord …  : ``DB<n>.DBD<byte>``                e.g. ``DB1.DBD8``
       - String   : ``DB<n>.DBB<byte>(<length>)``      e.g. ``DB1.DBB0(10)``
+
+    I area (Process Inputs – read-only):
+      - Boolean  : ``I<byte>.<bit>``         e.g. ``I0.0``
+      - Byte     : ``IB<byte>``              e.g. ``IB10``
+      - Word/Int : ``IW<byte>``              e.g. ``IW20``
+      - DWord …  : ``ID<byte>``              e.g. ``ID100``
+
+    Q area (Process Outputs – readable and writable):
+      - Boolean  : ``Q<byte>.<bit>``         e.g. ``Q0.0``
+      - Byte     : ``QB<byte>``              e.g. ``QB10``
+      - Word/Int : ``QW<byte>``              e.g. ``QW20``
+      - DWord …  : ``QD<byte>``              e.g. ``QD100``
 
     For **string** addresses the *length* specifies how many consecutive bytes
     form the raw ASCII byte array.  Each byte is interpreted as its ASCII
@@ -217,6 +231,98 @@ def parse_address(address: str, data_type: str) -> dict:
             "data_type": _resolve_dword_data_type(data_type),
         }
 
+    # ── I area (Process Inputs – read-only) ────────────────────────────────
+    m = re.match(r"^I(\d+)\.(\d+)$", addr)
+    if m:
+        bit = int(m.group(2))
+        if bit > 7:
+            raise ValueError(
+                f"Bit index {bit!r} is out of range 0–7 in address '{address}'"
+            )
+        return {
+            "area": AREA_I,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": bit,
+            "data_type": DATA_TYPE_BOOL,
+        }
+
+    m = re.match(r"^IB(\d+)$", addr)
+    if m:
+        return {
+            "area": AREA_I,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": 0,
+            "data_type": data_type if data_type in [DATA_TYPE_BYTE] else DATA_TYPE_BYTE,
+        }
+
+    m = re.match(r"^IW(\d+)$", addr)
+    if m:
+        return {
+            "area": AREA_I,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": 0,
+            "data_type": _resolve_word_data_type(data_type),
+        }
+
+    m = re.match(r"^ID(\d+)$", addr)
+    if m:
+        return {
+            "area": AREA_I,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": 0,
+            "data_type": _resolve_dword_data_type(data_type),
+        }
+
+    # ── Q area (Process Outputs – readable and writable) ───────────────────
+    m = re.match(r"^Q(\d+)\.(\d+)$", addr)
+    if m:
+        bit = int(m.group(2))
+        if bit > 7:
+            raise ValueError(
+                f"Bit index {bit!r} is out of range 0–7 in address '{address}'"
+            )
+        return {
+            "area": AREA_Q,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": bit,
+            "data_type": DATA_TYPE_BOOL,
+        }
+
+    m = re.match(r"^QB(\d+)$", addr)
+    if m:
+        return {
+            "area": AREA_Q,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": 0,
+            "data_type": data_type if data_type in [DATA_TYPE_BYTE] else DATA_TYPE_BYTE,
+        }
+
+    m = re.match(r"^QW(\d+)$", addr)
+    if m:
+        return {
+            "area": AREA_Q,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": 0,
+            "data_type": _resolve_word_data_type(data_type),
+        }
+
+    m = re.match(r"^QD(\d+)$", addr)
+    if m:
+        return {
+            "area": AREA_Q,
+            "db": 0,
+            "byte": int(m.group(1)),
+            "bit": 0,
+            "data_type": _resolve_dword_data_type(data_type),
+        }
+
     raise ValueError(f"Unrecognised PLC address format: '{address}'")
 
 
@@ -336,6 +442,10 @@ class Snap7Coordinator(DataUpdateCoordinator):
             length = parsed["string_length"]
             if area == AREA_DB:
                 raw = self._backend.db_read(db, byte, length)
+            elif area == AREA_I:
+                raw = self._backend.read_area_pe(byte, length)
+            elif area == AREA_Q:
+                raw = self._backend.read_area_pa(byte, length)
             else:
                 raw = self._backend.read_area_mk(byte, length)
             _ASCII_PRINTABLE_MIN = 32
@@ -349,6 +459,10 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
         if area == AREA_DB:
             raw = self._backend.db_read(db, byte, size)
+        elif area == AREA_I:
+            raw = self._backend.read_area_pe(byte, size)
+        elif area == AREA_Q:
+            raw = self._backend.read_area_pa(byte, size)
         else:
             raw = self._backend.read_area_mk(byte, size)
 
@@ -398,9 +512,17 @@ class Snap7Coordinator(DataUpdateCoordinator):
                 data_type = parsed["data_type"]
                 size = _data_size(data_type)
 
+                if area == AREA_I:
+                    raise ValueError(
+                        f"Tag '{tag_id}' maps to the I (process input) area which is "
+                        "read-only; writes are not permitted"
+                    )
+
                 # Read-modify-write (required for bit operations)
                 if area == AREA_DB:
                     raw = self._backend.db_read(db, byte, size)
+                elif area == AREA_Q:
+                    raw = self._backend.read_area_pa(byte, size)
                 else:
                     raw = self._backend.read_area_mk(byte, size)
 
@@ -456,6 +578,8 @@ class Snap7Coordinator(DataUpdateCoordinator):
 
                 if area == AREA_DB:
                     self._backend.db_write(db, byte, raw)
+                elif area == AREA_Q:
+                    self._backend.write_area_pa(byte, raw)
                 else:
                     self._backend.write_area_mk(byte, raw)
             except Exception:
