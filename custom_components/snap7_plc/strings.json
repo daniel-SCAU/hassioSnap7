@@ -41,6 +41,8 @@
         "menu_options": {
           "add_tag": "Add a new tag",
           "remove_tag": "Remove existing tag(s)",
+          "import_tags": "Import tags from YAML",
+          "export_tags": "Export tags to YAML",
           "settings": "Update scan interval",
           "save": "Save and close"
         }
@@ -63,6 +65,17 @@
           "tags_to_remove": "Tags to Remove"
         }
       },
+      "export_tags": {
+        "title": "Export Tags (YAML)",
+        "description": "Copy the YAML below to back up or share your current tag list.\n\n```yaml\n{yaml_content}```\n\nClick **Submit** to return to the menu."
+      },
+      "import_tags": {
+        "title": "Import Tags (YAML)",
+        "description": "Paste a YAML tag list to merge into your existing tags.\n\nAccepted formats:\n- A top-level list of tag objects.\n- A mapping with a `tags:` key containing the list.\n\nImported tags are **merged** — matched by `id` or by `(name, address)`. Existing tags not referenced by the import are kept unchanged.",
+        "data": {
+          "yaml_content": "YAML Content"
+        }
+      },
       "settings": {
         "title": "Scan Settings",
         "description": "How often should Home Assistant poll the PLC?",
@@ -73,7 +86,10 @@
     },
     "error": {
       "invalid_address": "Invalid PLC address format. See the description above for supported formats.",
-      "only_numeric_writable": "Only bool, int, dint, real, and input_number tags can be marked as Writable. Remove the Writable flag or choose a supported data type."
+      "only_numeric_writable": "Only bool, int, dint, real, and input_number tags can be marked as Writable. Remove the Writable flag or choose a supported data type.",
+      "invalid_yaml": "Could not parse YAML. Please check the syntax and try again.",
+      "invalid_yaml_structure": "Unexpected YAML structure. Provide either a top-level list or a mapping with a 'tags' key.",
+      "yaml_tag_validation_error": "One or more tags failed validation. Check that each tag has a valid 'name', 'address', and 'data_type'."
     }
   }
 }

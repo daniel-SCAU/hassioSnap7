@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+import yaml
 from typing import Any
 
 import voluptuous as vol
@@ -9,6 +10,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig
 
 from .const import (
     CONF_LIBRARY,
@@ -31,6 +33,125 @@ from .const import (
     LIBRARY_OPTIONS,
 )
 from .coordinator import parse_address
+
+
+# Data types that support writable entities
+_WRITABLE_TYPES = (
+    DATA_TYPE_BOOL,
+    DATA_TYPE_INPUT_NUMBER,
+    DATA_TYPE_INT,
+    DATA_TYPE_DINT,
+    DATA_TYPE_REAL,
+)
+
+
+def _validate_and_normalize_tag(item: Any) -> dict[str, Any]:
+    """Validate and normalize a single tag from imported YAML.
+
+    Required fields in *item*: ``name`` (non-empty string), ``address``.
+    Optional fields: ``data_type`` (defaults to the first entry in ``DATA_TYPES``),
+    ``unit`` (defaults to ``""``), ``writable`` (defaults to ``False``), ``id``
+    (a valid non-empty string is preserved; otherwise a new UUID is generated).
+
+    Transformations applied:
+    - ``name`` and ``address`` are stripped of leading/trailing whitespace.
+    - ``address`` is validated by ``parse_address``; the resolved data_type from
+      that call (``resolved_data_type``) is stored unless the supplied
+      ``data_type`` is ``input_number``, which is preserved as-is.
+    - ``input_number`` tags are unconditionally set to ``writable=True``.
+    - Other non-writable data_types with ``writable=True`` raise ``ValueError``.
+
+    Returns a normalised tag ``dict`` with keys: ``id``, ``name``, ``address``,
+    ``data_type``, ``unit``, ``writable``.
+
+    Raises ``ValueError`` with a descriptive message on validation failure.
+    """
+    if not isinstance(item, dict):
+        raise ValueError("Each tag entry must be a YAML mapping")
+
+    name = str(item.get("name", "")).strip()
+    if not name:
+        raise ValueError("Tag 'name' is required and must not be empty")
+
+    address = str(item.get("address", "")).strip()
+    if not address:
+        raise ValueError(f"Tag '{name}': 'address' is required")
+
+    data_type_raw = item.get("data_type")
+    data_type = str(data_type_raw).strip() if data_type_raw is not None else DATA_TYPES[0]
+    if data_type not in DATA_TYPES:
+        raise ValueError(f"Tag '{name}': unknown data_type '{data_type}'")
+
+    try:
+        parsed = parse_address(address, data_type)
+    except ValueError as exc:
+        raise ValueError(f"Tag '{name}': invalid address '{address}': {exc}") from exc
+
+    effective_data_type = parsed["data_type"]
+
+    writable = bool(item.get("writable", False))
+    # input_number is always writable; parse_address resolves it to int/dint,
+    # so we check the originally-supplied data_type before resolution.
+    if data_type == DATA_TYPE_INPUT_NUMBER:
+        writable = True
+    elif writable and effective_data_type not in _WRITABLE_TYPES:
+        raise ValueError(
+            f"Tag '{name}': data_type '{effective_data_type}' cannot be writable"
+        )
+
+    raw_id = item.get("id")
+    if raw_id and isinstance(raw_id, str) and raw_id.strip():
+        tag_id = raw_id.strip()
+    else:
+        tag_id = str(uuid.uuid4())
+
+    return {
+        "id": tag_id,
+        "name": name,
+        "address": address,
+        # Preserve input_number as the stored data_type; the coordinator has
+        # explicit handling for it.  All other types use the value resolved by
+        # parse_address (which may differ, e.g. word → int).
+        "data_type": data_type if data_type == DATA_TYPE_INPUT_NUMBER else effective_data_type,
+        "unit": str(item.get("unit") or ""),
+        "writable": writable,
+    }
+
+
+def _merge_tags(existing: list[dict], imported: list[dict]) -> list[dict]:
+    """Merge imported tags into existing tags.
+
+    Neither *existing* nor *imported* is mutated; a new list is always returned.
+
+    Matching strategy:
+      1. Match by ``id`` when it corresponds to an existing tag.
+      2. Otherwise match by ``(name.lower(), address.upper())``.
+    Matched tags are updated with imported fields; unmatched imported tags are
+    appended.  Existing tags not referenced by the import are kept unchanged.
+    """
+    result: list[dict] = [dict(t) for t in existing]
+
+    id_index: dict[str, int] = {t["id"]: i for i, t in enumerate(result)}
+    key_index: dict[tuple[str, str], int] = {
+        (t["name"].lower().strip(), t["address"].upper().strip()): i
+        for i, t in enumerate(result)
+    }
+
+    for imp_tag in imported:
+        imp_id = imp_tag["id"]
+        imp_key = (imp_tag["name"].lower().strip(), imp_tag["address"].upper().strip())
+
+        if imp_id in id_index:
+            result[id_index[imp_id]] = dict(imp_tag)
+        elif imp_key in key_index:
+            idx = key_index[imp_key]
+            updated = dict(imp_tag)
+            updated["id"] = result[idx]["id"]
+            result[idx] = updated
+        else:
+            result.append(dict(imp_tag))
+
+    return result
 
 
 _S7_PORT = 102  # Standard Siemens S7 TCP port
@@ -215,7 +336,14 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.FlowResult:
         return self.async_show_menu(
             step_id="menu",
-            menu_options=["add_tag", "remove_tag", "settings", "save"],
+            menu_options=[
+                "add_tag",
+                "remove_tag",
+                "import_tags",
+                "export_tags",
+                "settings",
+                "save",
+            ],
         )
 
     # ── add tag ─────────────────────────────────────────────────────────────
@@ -233,13 +361,6 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             except ValueError:
                 errors["address"] = "invalid_address"
             else:
-                _WRITABLE_TYPES = (
-                    DATA_TYPE_BOOL,
-                    DATA_TYPE_INPUT_NUMBER,
-                    DATA_TYPE_INT,
-                    DATA_TYPE_DINT,
-                    DATA_TYPE_REAL,
-                )
                 if user_input.get("writable") and parsed["data_type"] not in _WRITABLE_TYPES:
                     errors["writable"] = "only_numeric_writable"
                 else:
@@ -296,6 +417,93 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         )
 
         return self.async_show_form(step_id="remove_tag", data_schema=schema)
+
+    # ── export tags ─────────────────────────────────────────────────────────
+
+    async def async_step_export_tags(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Display the current tag list as YAML for copy/paste."""
+        if user_input is not None:
+            return await self.async_step_menu()
+
+        tags_data = [
+            {
+                "id": t["id"],
+                "name": t["name"],
+                "address": t["address"],
+                "data_type": t["data_type"],
+                "unit": t.get("unit", ""),
+                "writable": t.get("writable", False),
+            }
+            for t in self._tags
+        ]
+        yaml_text = yaml.dump(
+            {"tags": tags_data},
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+
+        return self.async_show_form(
+            step_id="export_tags",
+            data_schema=vol.Schema({}),
+            description_placeholders={"yaml_content": yaml_text},
+        )
+
+    # ── import tags ──────────────────────────────────────────────────────────
+
+    async def async_step_import_tags(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Import tags from YAML and merge with existing tags."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            raw_yaml = (user_input.get("yaml_content") or "").strip()
+            try:
+                parsed_yaml = yaml.safe_load(raw_yaml)
+            except yaml.YAMLError:
+                errors["yaml_content"] = "invalid_yaml"
+                parsed_yaml = None
+
+            if parsed_yaml is not None:
+                if isinstance(parsed_yaml, list):
+                    tag_list: list | None = parsed_yaml
+                elif isinstance(parsed_yaml, dict) and isinstance(
+                    parsed_yaml.get("tags"), list
+                ):
+                    tag_list = parsed_yaml["tags"]
+                else:
+                    errors["yaml_content"] = "invalid_yaml_structure"
+                    tag_list = None
+
+                if tag_list is not None:
+                    validated: list[dict] = []
+                    for item in tag_list:
+                        try:
+                            validated.append(_validate_and_normalize_tag(item))
+                        except ValueError:
+                            errors["yaml_content"] = "yaml_tag_validation_error"
+                            break
+
+                    if not errors:
+                        self._tags = _merge_tags(self._tags, validated)
+                        return await self.async_step_menu()
+
+        schema = vol.Schema(
+            {
+                vol.Required("yaml_content"): TextSelector(
+                    TextSelectorConfig(multiline=True)
+                ),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="import_tags",
+            data_schema=schema,
+            errors=errors,
+        )
 
     # ── settings ────────────────────────────────────────────────────────────
 
