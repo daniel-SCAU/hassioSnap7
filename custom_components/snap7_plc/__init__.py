@@ -53,7 +53,8 @@ def _cleanup_orphaned_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
     ent_reg = er.async_get(hass)
     for entity_entry in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
         uid = entity_entry.unique_id or ""
-        if uid.startswith(prefix) and uid[len(prefix):] not in active_tag_ids:
+        tag_id = uid.removeprefix(prefix)
+        if tag_id != uid and tag_id not in active_tag_ids:
             _LOGGER.debug(
                 "Removing orphaned entity %s (unique_id=%s)",
                 entity_entry.entity_id,

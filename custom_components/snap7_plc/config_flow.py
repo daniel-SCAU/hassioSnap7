@@ -48,7 +48,23 @@ _WRITABLE_TYPES = (
 def _validate_and_normalize_tag(item: Any) -> dict[str, Any]:
     """Validate and normalize a single tag from imported YAML.
 
-    Returns a normalized tag dict. Raises ValueError on validation failure.
+    Required fields in *item*: ``name`` (non-empty string), ``address``.
+    Optional fields: ``data_type`` (defaults to the first entry in ``DATA_TYPES``),
+    ``unit`` (defaults to ``""``), ``writable`` (defaults to ``False``), ``id``
+    (a valid non-empty string is preserved; otherwise a new UUID is generated).
+
+    Transformations applied:
+    - ``name`` and ``address`` are stripped of leading/trailing whitespace.
+    - ``address`` is validated by ``parse_address``; the resolved data_type from
+      that call (``resolved_data_type``) is stored unless the supplied
+      ``data_type`` is ``input_number``, which is preserved as-is.
+    - ``input_number`` tags are unconditionally set to ``writable=True``.
+    - Other non-writable data_types with ``writable=True`` raise ``ValueError``.
+
+    Returns a normalised tag ``dict`` with keys: ``id``, ``name``, ``address``,
+    ``data_type``, ``unit``, ``writable``.
+
+    Raises ``ValueError`` with a descriptive message on validation failure.
     """
     if not isinstance(item, dict):
         raise ValueError("Each tag entry must be a YAML mapping")
@@ -104,6 +120,8 @@ def _validate_and_normalize_tag(item: Any) -> dict[str, Any]:
 
 def _merge_tags(existing: list[dict], imported: list[dict]) -> list[dict]:
     """Merge imported tags into existing tags.
+
+    Neither *existing* nor *imported* is mutated; a new list is always returned.
 
     Matching strategy:
       1. Match by ``id`` when it corresponds to an existing tag.
