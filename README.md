@@ -11,6 +11,8 @@ A Home Assistant custom integration that interfaces with **Siemens S7 PLCs** (S7
 | **Configurable IP** | Set (and later change via *Reconfigure*) the PLC IP address, rack, and slot |
 | **M area tags** | Merker booleans, bytes, words, dwords |
 | **DB area tags** | Data-Block booleans, bytes, words, dwords |
+| **I area tags** | Process-input booleans, bytes, words, dwords (read-only) |
+| **Q area tags** | Process-output booleans, bytes, words, dwords (readable and writable) |
 | **All numeric types** | `bool`, `byte`, `word`, `int`, `dword`, `dint`, `real` |
 | **Read-only sensors** | Numeric → `sensor` entity; boolean → `binary_sensor` entity |
 | **Writable boolean** | Mark a bool tag as *writable* → creates a `switch` entity |
@@ -75,6 +77,16 @@ Open the integration's **Configure** dialog (Settings → Devices & Services →
 | DB word/int | `DB<n>.DBW<byte>` | `DB1.DBW4` | |
 | DB dword/dint/real | `DB<n>.DBD<byte>` | `DB1.DBD8` | |
 | DB raw ASCII bytes | `DB<n>.DBB<byte>(<length>)` | `DB1.DBB0(10)` | Reads *length* consecutive bytes as a raw ASCII byte array (not Siemens S7 STRING format) |
+| Input boolean | `I<byte>.<bit>` | `I0.0` | Process input area – **read-only** |
+| Input byte | `IB<byte>` | `IB10` | Process input area – **read-only** |
+| Input word/int | `IW<byte>` | `IW20` | Process input area – **read-only** |
+| Input dword/dint/real | `ID<byte>` | `ID100` | Process input area – **read-only** |
+| Output boolean | `Q<byte>.<bit>` | `Q0.0` | Process output area; creates a `switch` if writable |
+| Output byte | `QB<byte>` | `QB10` | Process output area; writable |
+| Output word/int | `QW<byte>` | `QW20` | Process output area; writable |
+| Output dword/dint/real | `QD<byte>` | `QD100` | Process output area; writable |
+
+> **Note:** I area addresses are **read-only** – attempting to write to an I address will raise an error.  Q area addresses support both reads and writes.
 
 ---
 

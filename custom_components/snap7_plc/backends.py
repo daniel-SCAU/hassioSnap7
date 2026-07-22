@@ -56,6 +56,18 @@ class PlcBackend(ABC):
     def write_area_mk(self, start: int, data: bytearray) -> None:
         """Write *data* to the Merker (M) area starting at *start*."""
 
+    @abstractmethod
+    def read_area_pe(self, start: int, size: int) -> bytearray:
+        """Read *size* bytes from the process input (I) area starting at *start*."""
+
+    @abstractmethod
+    def read_area_pa(self, start: int, size: int) -> bytearray:
+        """Read *size* bytes from the process output (Q) area starting at *start*."""
+
+    @abstractmethod
+    def write_area_pa(self, start: int, data: bytearray) -> None:
+        """Write *data* to the process output (Q) area starting at *start*."""
+
 
 # ---------------------------------------------------------------------------
 # python-snap7 backend
@@ -114,6 +126,21 @@ class Snap7Backend(PlcBackend):
         from snap7.type import Area
 
         self._client.write_area(Area.MK, 0, start, data)
+
+    def read_area_pe(self, start: int, size: int) -> bytearray:
+        from snap7.type import Area
+
+        return bytearray(self._client.read_area(Area.PE, 0, start, size))
+
+    def read_area_pa(self, start: int, size: int) -> bytearray:
+        from snap7.type import Area
+
+        return bytearray(self._client.read_area(Area.PA, 0, start, size))
+
+    def write_area_pa(self, start: int, data: bytearray) -> None:
+        from snap7.type import Area
+
+        self._client.write_area(Area.PA, 0, start, data)
 
 
 # ---------------------------------------------------------------------------

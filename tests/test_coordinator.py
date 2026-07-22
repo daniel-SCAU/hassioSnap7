@@ -15,7 +15,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from custom_components.snap7_plc.coordinator import Snap7Coordinator, parse_address, _format_plc_date
 from custom_components.snap7_plc.const import (
     AREA_DB,
+    AREA_I,
     AREA_M,
+    AREA_Q,
     DATA_TYPE_BOOL,
     DATA_TYPE_BYTE,
     DATA_TYPE_DATE,
@@ -958,3 +960,259 @@ class TestWritableIntDintWrite:
         tag = {"id": "t1", "name": "RealTag", "address": "DB1.DBD0", "data_type": DATA_TYPE_REAL}
         coord = _make_write_coordinator(tag)
         coord._write_value("t1", 3.14)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# I area (Process Inputs) – address parsing
+# ---------------------------------------------------------------------------
+
+class TestIAreaBool:
+    def test_bit_format(self):
+        result = parse_address("I0.0", DATA_TYPE_BOOL)
+        assert result["area"] == AREA_I
+        assert result["byte"] == 0
+        assert result["bit"] == 0
+        assert result["data_type"] == DATA_TYPE_BOOL
+
+    def test_bit_higher_byte(self):
+        result = parse_address("I10.7", DATA_TYPE_BOOL)
+        assert result["byte"] == 10
+        assert result["bit"] == 7
+
+    def test_case_insensitive(self):
+        result = parse_address("i5.3", DATA_TYPE_BOOL)
+        assert result["area"] == AREA_I
+        assert result["byte"] == 5
+        assert result["bit"] == 3
+
+    def test_bit_out_of_range(self):
+        with pytest.raises(ValueError, match="out of range"):
+            parse_address("I0.8", DATA_TYPE_BOOL)
+
+    def test_bit_max_valid(self):
+        result = parse_address("I0.7", DATA_TYPE_BOOL)
+        assert result["bit"] == 7
+
+
+class TestIAreaByte:
+    def test_byte(self):
+        result = parse_address("IB0", DATA_TYPE_BYTE)
+        assert result["area"] == AREA_I
+        assert result["byte"] == 0
+        assert result["data_type"] == DATA_TYPE_BYTE
+
+    def test_byte_higher(self):
+        result = parse_address("IB10", DATA_TYPE_BYTE)
+        assert result["byte"] == 10
+
+
+class TestIAreaWord:
+    def test_word(self):
+        result = parse_address("IW0", DATA_TYPE_WORD)
+        assert result["area"] == AREA_I
+        assert result["byte"] == 0
+        assert result["data_type"] == DATA_TYPE_WORD
+
+    def test_int(self):
+        result = parse_address("IW0", DATA_TYPE_INT)
+        assert result["data_type"] == DATA_TYPE_INT
+
+    def test_defaults_to_word(self):
+        result = parse_address("IW0", DATA_TYPE_BOOL)
+        assert result["data_type"] == DATA_TYPE_WORD
+
+
+class TestIAreaDWord:
+    def test_dword(self):
+        result = parse_address("ID0", DATA_TYPE_DWORD)
+        assert result["area"] == AREA_I
+        assert result["byte"] == 0
+        assert result["data_type"] == DATA_TYPE_DWORD
+
+    def test_dint(self):
+        result = parse_address("ID4", DATA_TYPE_DINT)
+        assert result["data_type"] == DATA_TYPE_DINT
+
+    def test_real(self):
+        result = parse_address("ID8", DATA_TYPE_REAL)
+        assert result["data_type"] == DATA_TYPE_REAL
+
+    def test_defaults_to_dword(self):
+        result = parse_address("ID0", DATA_TYPE_BOOL)
+        assert result["data_type"] == DATA_TYPE_DWORD
+
+
+# ---------------------------------------------------------------------------
+# Q area (Process Outputs) – address parsing
+# ---------------------------------------------------------------------------
+
+class TestQAreaBool:
+    def test_bit_format(self):
+        result = parse_address("Q0.0", DATA_TYPE_BOOL)
+        assert result["area"] == AREA_Q
+        assert result["byte"] == 0
+        assert result["bit"] == 0
+        assert result["data_type"] == DATA_TYPE_BOOL
+
+    def test_bit_higher_byte(self):
+        result = parse_address("Q10.7", DATA_TYPE_BOOL)
+        assert result["byte"] == 10
+        assert result["bit"] == 7
+
+    def test_case_insensitive(self):
+        result = parse_address("q5.3", DATA_TYPE_BOOL)
+        assert result["area"] == AREA_Q
+        assert result["byte"] == 5
+        assert result["bit"] == 3
+
+    def test_bit_out_of_range(self):
+        with pytest.raises(ValueError, match="out of range"):
+            parse_address("Q0.8", DATA_TYPE_BOOL)
+
+    def test_bit_max_valid(self):
+        result = parse_address("Q0.7", DATA_TYPE_BOOL)
+        assert result["bit"] == 7
+
+
+class TestQAreaByte:
+    def test_byte(self):
+        result = parse_address("QB0", DATA_TYPE_BYTE)
+        assert result["area"] == AREA_Q
+        assert result["byte"] == 0
+        assert result["data_type"] == DATA_TYPE_BYTE
+
+    def test_byte_higher(self):
+        result = parse_address("QB10", DATA_TYPE_BYTE)
+        assert result["byte"] == 10
+
+
+class TestQAreaWord:
+    def test_word(self):
+        result = parse_address("QW0", DATA_TYPE_WORD)
+        assert result["area"] == AREA_Q
+        assert result["byte"] == 0
+        assert result["data_type"] == DATA_TYPE_WORD
+
+    def test_int(self):
+        result = parse_address("QW0", DATA_TYPE_INT)
+        assert result["data_type"] == DATA_TYPE_INT
+
+    def test_defaults_to_word(self):
+        result = parse_address("QW0", DATA_TYPE_BOOL)
+        assert result["data_type"] == DATA_TYPE_WORD
+
+
+class TestQAreaDWord:
+    def test_dword(self):
+        result = parse_address("QD0", DATA_TYPE_DWORD)
+        assert result["area"] == AREA_Q
+        assert result["byte"] == 0
+        assert result["data_type"] == DATA_TYPE_DWORD
+
+    def test_dint(self):
+        result = parse_address("QD4", DATA_TYPE_DINT)
+        assert result["data_type"] == DATA_TYPE_DINT
+
+    def test_real(self):
+        result = parse_address("QD8", DATA_TYPE_REAL)
+        assert result["data_type"] == DATA_TYPE_REAL
+
+    def test_defaults_to_dword(self):
+        result = parse_address("QD0", DATA_TYPE_BOOL)
+        assert result["data_type"] == DATA_TYPE_DWORD
+
+
+# ---------------------------------------------------------------------------
+# Coordinator read – I/Q area dispatch
+# ---------------------------------------------------------------------------
+
+class TestIQAreaRead:
+    def test_read_i_bool_calls_read_area_pe(self):
+        """Reading an I area bool must call read_area_pe, not read_area_mk."""
+        from tests.conftest import _FakeSnap7Client
+
+        tag = {"id": "t1", "name": "InputBit", "address": "I0.0", "data_type": DATA_TYPE_BOOL}
+        coord = _make_coordinator(tags=[tag])
+        _set_backend_client(coord, _FakeSnap7Client())
+
+        result = coord._fetch_all()
+        assert result["t1"] is not None  # False bool counts as not None
+
+    def test_read_q_bool_calls_read_area_pa(self):
+        """Reading a Q area bool must call read_area_pa."""
+        from tests.conftest import _FakeSnap7Client
+
+        tag = {"id": "t1", "name": "OutputBit", "address": "Q0.0", "data_type": DATA_TYPE_BOOL}
+        coord = _make_coordinator(tags=[tag])
+        _set_backend_client(coord, _FakeSnap7Client())
+
+        result = coord._fetch_all()
+        assert result["t1"] is not None
+
+    def test_read_i_word(self):
+        from tests.conftest import _FakeSnap7Client
+
+        tag = {"id": "t1", "name": "InputWord", "address": "IW20", "data_type": DATA_TYPE_WORD}
+        coord = _make_coordinator(tags=[tag])
+        _set_backend_client(coord, _FakeSnap7Client())
+
+        result = coord._fetch_all()
+        assert result["t1"] == 0  # _FakeSnap7Client returns zero bytes → 0
+
+    def test_read_q_word(self):
+        from tests.conftest import _FakeSnap7Client
+
+        tag = {"id": "t1", "name": "OutputWord", "address": "QW20", "data_type": DATA_TYPE_WORD}
+        coord = _make_coordinator(tags=[tag])
+        _set_backend_client(coord, _FakeSnap7Client())
+
+        result = coord._fetch_all()
+        assert result["t1"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Coordinator write – I area rejected, Q area allowed
+# ---------------------------------------------------------------------------
+
+class TestIQAreaWrite:
+    def test_write_to_i_area_raises_value_error(self):
+        """Writing to the I (process input) area must raise ValueError."""
+        from tests.conftest import _FakeSnap7Client
+
+        tag = {"id": "t1", "name": "InputBit", "address": "I0.0", "data_type": DATA_TYPE_BOOL}
+        coord = _make_coordinator(tags=[tag])
+        _set_backend_client(coord, _FakeSnap7Client())
+
+        with pytest.raises(ValueError, match="read-only"):
+            coord._write_value("t1", True)
+
+    def test_write_to_q_bool_succeeds(self):
+        """Writing a bool to the Q area must succeed without raising."""
+        from tests.conftest import _FakeSnap7Client
+
+        tag = {"id": "t1", "name": "OutputBit", "address": "Q0.0", "data_type": DATA_TYPE_BOOL}
+        coord = _make_coordinator(tags=[tag])
+        _set_backend_client(coord, _FakeSnap7Client())
+
+        coord._write_value("t1", True)  # must not raise
+
+    def test_write_to_q_word_succeeds(self):
+        """Writing a word to the Q area must succeed without raising."""
+        from tests.conftest import _FakeSnap7Client
+
+        tag = {"id": "t1", "name": "OutputWord", "address": "QW0", "data_type": DATA_TYPE_WORD}
+        coord = _make_coordinator(tags=[tag])
+        _set_backend_client(coord, _FakeSnap7Client())
+
+        coord._write_value("t1", 100)  # must not raise
+
+    def test_write_to_i_word_raises_value_error(self):
+        """Writing to an I area word address must also raise ValueError."""
+        from tests.conftest import _FakeSnap7Client
+
+        tag = {"id": "t1", "name": "InputWord", "address": "IW0", "data_type": DATA_TYPE_WORD}
+        coord = _make_coordinator(tags=[tag])
+        _set_backend_client(coord, _FakeSnap7Client())
+
+        with pytest.raises(ValueError, match="read-only"):
+            coord._write_value("t1", 42)

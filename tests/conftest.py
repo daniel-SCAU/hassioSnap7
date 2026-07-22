@@ -100,12 +100,15 @@ ha_number.NumberEntity = object  # type: ignore[attr-defined]
 # snap7 stubs – replaced per-test with unittest.mock when behaviour matters
 # ---------------------------------------------------------------------------
 
-_make_stub("snap7", "snap7.client", "snap7.util", "snap7.types")
+_make_stub("snap7", "snap7.client", "snap7.util", "snap7.type", "snap7.types")
 
 snap7_mod = sys.modules["snap7"]
 snap7_client_mod = sys.modules["snap7.client"]
 snap7_util_mod = sys.modules["snap7.util"]
+snap7_type_mod = sys.modules["snap7.type"]
 snap7_types_mod = sys.modules["snap7.types"]
+
+snap7_type_mod.Area = types.SimpleNamespace(MK=0x83, PE=0x81, PA=0x82)  # type: ignore[attr-defined]
 
 
 class _FakeSnap7Client:
@@ -160,4 +163,4 @@ snap7_util_mod.set_dint = _noop_set  # type: ignore[attr-defined]
 snap7_util_mod.set_dword = _noop_set  # type: ignore[attr-defined]
 snap7_util_mod.set_real = _noop_set  # type: ignore[attr-defined]
 
-snap7_types_mod.Areas = types.SimpleNamespace(MK=0x83)  # type: ignore[attr-defined]
+snap7_types_mod.Areas = types.SimpleNamespace(MK=0x83, PE=0x81, PA=0x82)  # type: ignore[attr-defined]
