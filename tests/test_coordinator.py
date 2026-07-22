@@ -1148,13 +1148,21 @@ class TestIQAreaRead:
 
     def test_read_q_bool_calls_read_area_pa(self):
         """Reading a Q area bool must call read_area_pa."""
+        from unittest.mock import Mock
+
         from tests.conftest import _FakeSnap7Client
 
         tag = {"id": "t1", "name": "OutputBit", "address": "Q0.0", "data_type": DATA_TYPE_BOOL}
         coord = _make_coordinator(tags=[tag])
         _set_backend_client(coord, _FakeSnap7Client())
 
+        coord._backend.read_area_pa = Mock(wraps=coord._backend.read_area_pa)
+        coord._backend.read_area_mk = Mock(wraps=coord._backend.read_area_mk)
+
         result = coord._fetch_all()
+
+        coord._backend.read_area_pa.assert_called()
+        coord._backend.read_area_mk.assert_not_called()
         assert result["t1"] is not None
 
     def test_read_i_word(self):
