@@ -460,12 +460,17 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            raw_yaml = (user_input.get("yaml_content") or "").strip()
-            try:
-                parsed_yaml = yaml.safe_load(raw_yaml)
-            except yaml.YAMLError:
+            raw_yaml = (user_input.get("yaml_content") or "")
+            if not raw_yaml.strip():
                 errors["yaml_content"] = "invalid_yaml"
                 parsed_yaml = None
+            else:
+                raw_yaml = raw_yaml.strip()
+                try:
+                    parsed_yaml = yaml.safe_load(raw_yaml)
+                except yaml.YAMLError:
+                    errors["yaml_content"] = "invalid_yaml"
+                    parsed_yaml = None
 
             if parsed_yaml is not None:
                 if isinstance(parsed_yaml, list):
