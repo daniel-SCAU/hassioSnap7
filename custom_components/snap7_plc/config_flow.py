@@ -200,7 +200,11 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         self._tags: list[dict] = []
         for tag in config_entry.options.get(CONF_TAGS, []):
             normalized_tag = dict(tag)
-            normalized_tag["address"] = normalize_address(tag.get("address", ""))
+            address = tag.get("address")
+            if isinstance(address, str):
+                normalized_address = normalize_address(address)
+                if normalized_address:
+                    normalized_tag["address"] = normalized_address
             self._tags.append(normalized_tag)
         self._scan_interval: int = config_entry.options.get(
             CONF_SCAN_INTERVAL,
@@ -232,37 +236,40 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             address = normalize_address(user_input.get("address", ""))
             data_type = user_input.get("data_type", "")
-            try:
-                parsed = parse_address(address, data_type)
-            except ValueError:
+            if not address:
                 errors["address"] = "invalid_address"
             else:
-                _WRITABLE_TYPES = (
-                    DATA_TYPE_BOOL,
-                    DATA_TYPE_INPUT_NUMBER,
-                    DATA_TYPE_INT,
-                    DATA_TYPE_DINT,
-                    DATA_TYPE_REAL,
-                )
-                if user_input.get("writable") and parsed["data_type"] not in _WRITABLE_TYPES:
-                    errors["writable"] = "only_numeric_writable"
+                try:
+                    parsed = parse_address(address, data_type)
+                except ValueError:
+                    errors["address"] = "invalid_address"
                 else:
-                    # input_number is always writable regardless of the checkbox
-                    is_writable = (
-                        True
-                        if parsed["data_type"] == DATA_TYPE_INPUT_NUMBER
-                        else user_input.get("writable", False)
+                    _WRITABLE_TYPES = (
+                        DATA_TYPE_BOOL,
+                        DATA_TYPE_INPUT_NUMBER,
+                        DATA_TYPE_INT,
+                        DATA_TYPE_DINT,
+                        DATA_TYPE_REAL,
                     )
-                    tag: dict[str, Any] = {
-                        "id": str(uuid.uuid4()),
-                        "name": user_input["name"].strip(),
-                        "address": address,
-                        "data_type": parsed["data_type"],
-                        "unit": user_input.get("unit", ""),
-                        "writable": is_writable,
-                    }
-                    self._tags.append(tag)
-                    return await self.async_step_menu()
+                    if user_input.get("writable") and parsed["data_type"] not in _WRITABLE_TYPES:
+                        errors["writable"] = "only_numeric_writable"
+                    else:
+                        # input_number is always writable regardless of the checkbox
+                        is_writable = (
+                            True
+                            if parsed["data_type"] == DATA_TYPE_INPUT_NUMBER
+                            else user_input.get("writable", False)
+                        )
+                        tag: dict[str, Any] = {
+                            "id": str(uuid.uuid4()),
+                            "name": user_input["name"].strip(),
+                            "address": address,
+                            "data_type": parsed["data_type"],
+                            "unit": user_input.get("unit", ""),
+                            "writable": is_writable,
+                        }
+                        self._tags.append(tag)
+                        return await self.async_step_menu()
 
         schema = vol.Schema(
             {
