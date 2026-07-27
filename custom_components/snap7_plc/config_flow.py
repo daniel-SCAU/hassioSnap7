@@ -30,7 +30,7 @@ from .const import (
     DOMAIN,
     LIBRARY_OPTIONS,
 )
-from .coordinator import parse_address
+from .coordinator import normalize_address, parse_address
 
 
 _S7_PORT = 102  # Standard Siemens S7 TCP port
@@ -197,7 +197,11 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
     """Handle options: add / remove tags and update scan interval."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self._tags: list[dict] = list(config_entry.options.get(CONF_TAGS, []))
+        self._tags: list[dict] = []
+        for tag in config_entry.options.get(CONF_TAGS, []):
+            normalized_tag = dict(tag)
+            normalized_tag["address"] = normalize_address(tag.get("address", ""))
+            self._tags.append(normalized_tag)
         self._scan_interval: int = config_entry.options.get(
             CONF_SCAN_INTERVAL,
             config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
@@ -226,7 +230,7 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            address = user_input.get("address", "").strip()
+            address = normalize_address(user_input.get("address", ""))
             data_type = user_input.get("data_type", "")
             try:
                 parsed = parse_address(address, data_type)
