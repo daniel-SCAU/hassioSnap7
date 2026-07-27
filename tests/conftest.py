@@ -24,7 +24,9 @@ _make_stub(
     "homeassistant.helpers.update_coordinator",
     "homeassistant.helpers.entity",
     "homeassistant.helpers.entity_platform",
+    "homeassistant.helpers.entity_registry",
     "homeassistant.helpers.config_validation",
+    "homeassistant.helpers.selector",
     "homeassistant.components",
     "homeassistant.components.sensor",
     "homeassistant.components.binary_sensor",
@@ -47,8 +49,23 @@ ha_const.Platform = types.SimpleNamespace(  # type: ignore[attr-defined]
 ha_entries = sys.modules["homeassistant.config_entries"]
 ha_entries.ConfigEntry = object  # type: ignore[attr-defined]
 
+
+class _FakeFlowBase:
+    """Accept arbitrary class keyword arguments such as ``domain=``."""
+
+    def __init_subclass__(cls, **kwargs):  # type: ignore[override]
+        super().__init_subclass__()
+
+
+ha_entries.ConfigFlow = _FakeFlowBase  # type: ignore[attr-defined]
+ha_entries.OptionsFlow = object  # type: ignore[attr-defined]
+ha_entries.FlowResult = dict  # type: ignore[attr-defined]
+
 ha_exc = sys.modules["homeassistant.exceptions"]
 ha_exc.ConfigEntryNotReady = Exception  # type: ignore[attr-defined]
+
+ha_core = sys.modules["homeassistant.core"]
+ha_core.callback = lambda f: f  # type: ignore[attr-defined]
 
 ha_coord = sys.modules["homeassistant.helpers.update_coordinator"]
 
@@ -83,6 +100,38 @@ ha_entity.DeviceInfo = dict  # type: ignore[attr-defined]
 
 ha_entity_platform = sys.modules["homeassistant.helpers.entity_platform"]
 ha_entity_platform.AddEntitiesCallback = object  # type: ignore[attr-defined]
+
+# Stub entity_registry helpers used by __init__.py
+ha_entity_registry = sys.modules["homeassistant.helpers.entity_registry"]
+
+
+def _stub_async_get(_hass):
+    return None
+
+
+def _stub_async_entries_for_config_entry(_reg, _entry_id):
+    return []
+
+
+ha_entity_registry.async_get = _stub_async_get  # type: ignore[attr-defined]
+ha_entity_registry.async_entries_for_config_entry = _stub_async_entries_for_config_entry  # type: ignore[attr-defined]
+
+# Stub selector helpers used by config_flow.py
+ha_selector = sys.modules["homeassistant.helpers.selector"]
+
+
+class _FakeTextSelectorConfig:
+    def __init__(self, **kwargs):
+        pass
+
+
+class _FakeTextSelector:
+    def __init__(self, config=None):
+        pass
+
+
+ha_selector.TextSelector = _FakeTextSelector  # type: ignore[attr-defined]
+ha_selector.TextSelectorConfig = _FakeTextSelectorConfig  # type: ignore[attr-defined]
 
 ha_sensor = sys.modules["homeassistant.components.sensor"]
 ha_sensor.SensorEntity = object  # type: ignore[attr-defined]
