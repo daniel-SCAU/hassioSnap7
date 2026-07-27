@@ -89,7 +89,14 @@ def _validate_and_normalize_tag(item: Any) -> dict[str, Any]:
 
     effective_data_type = parsed["data_type"]
 
-    writable = bool(item.get("writable", False))
+    raw_writable = item.get("writable", False)
+    if raw_writable is None:
+        writable = False
+    elif isinstance(raw_writable, bool):
+        writable = raw_writable
+    else:
+        raise ValueError(f"Tag '{name}': 'writable' must be a boolean")
+
     # input_number is always writable; parse_address resolves it to int/dint,
     # so we check the originally-supplied data_type before resolution.
     if data_type == DATA_TYPE_INPUT_NUMBER:
