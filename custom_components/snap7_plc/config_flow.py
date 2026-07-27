@@ -438,7 +438,7 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             }
             for t in self._tags
         ]
-        yaml_text = yaml.dump(
+        yaml_text = yaml.safe_dump(
             {"tags": tags_data},
             default_flow_style=False,
             allow_unicode=True,
