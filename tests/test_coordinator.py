@@ -12,7 +12,12 @@ import os
 # Add the repo root so we can import custom_components directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from custom_components.snap7_plc.coordinator import Snap7Coordinator, parse_address, _format_plc_date
+from custom_components.snap7_plc.coordinator import (
+    Snap7Coordinator,
+    _format_plc_date,
+    normalize_address,
+    parse_address,
+)
 from custom_components.snap7_plc.const import (
     AREA_DB,
     AREA_I,
@@ -34,6 +39,14 @@ from custom_components.snap7_plc.const import (
 # ---------------------------------------------------------------------------
 # M area
 # ---------------------------------------------------------------------------
+
+class TestAddressNormalization:
+    def test_normalize_address_strips_and_uppercases(self):
+        assert normalize_address("  mW30  ") == "MW30"
+
+    def test_normalize_address_db_tag(self):
+        assert normalize_address("db1.dbx0.0") == "DB1.DBX0.0"
+
 
 class TestMAreaBool:
     def test_bit_format(self):

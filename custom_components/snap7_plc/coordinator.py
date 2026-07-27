@@ -34,6 +34,11 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def normalize_address(address: str) -> str:
+    """Normalize a PLC tag address to canonical storage format."""
+    return address.strip().upper()
+
+
 # ---------------------------------------------------------------------------
 # Address parser
 # ---------------------------------------------------------------------------
@@ -109,7 +114,7 @@ def parse_address(address: str, data_type: str) -> dict:
     The *data_type* argument refines interpretation when the address prefix
     is ambiguous (e.g. ``DBW`` can be ``word`` or ``int``).
     """
-    addr = address.strip().upper()
+    addr = normalize_address(address)
 
     # ── DB area ────────────────────────────────────────────────────────────
     m = re.match(r"^DB(\d+)\.DBX(\d+)\.(\d+)$", addr)
