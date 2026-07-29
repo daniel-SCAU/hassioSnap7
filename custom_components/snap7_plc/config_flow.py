@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 import yaml
+import re
 from typing import Any
 
 import voluptuous as vol
@@ -19,6 +20,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     CONF_SLOT,
     CONF_TAGS,
+    CONF_TAG_LABEL,
     DATA_TYPE_BOOL,
     DATA_TYPE_DINT,
     DATA_TYPE_INPUT_NUMBER,
@@ -159,6 +161,48 @@ def _merge_tags(existing: list[dict], imported: list[dict]) -> list[dict]:
             result.append(dict(imp_tag))
 
     return result
+
+
+def _format_tag_name_with_label(name: str, label: str) -> str:
+    """Return name formatted as ``[LABEL].suffix``."""
+    clean_label = str(label).strip()
+    if not clean_label:
+        raise ValueError("Tag label is required and must not be empty")
+
+    original_name = str(name).strip()
+    if not original_name:
+        return f"[{clean_label}]."
+
+    suffix = re.sub(r"^PLC\s+\S+\s+", "", original_name)
+    suffix = suffix.strip() or original_name
+    return f"[{clean_label}].{suffix}"
+
+
+def _apply_label_to_new_imported_tags(
+    existing: list[dict], imported: list[dict], label: str
+) -> list[dict]:
+    """Apply label formatting only to imported tags that are new."""
+    existing_ids = {str(t.get("id", "")).strip() for t in existing}
+    existing_keys = {
+        (
+            str(t.get("name", "")).lower().strip(),
+            str(t.get("address", "")).upper().strip(),
+        )
+        for t in existing
+    }
+
+    processed: list[dict] = []
+    for imported_tag in imported:
+        tag = dict(imported_tag)
+        tag_id = str(tag.get("id", "")).strip()
+        tag_key = (
+            str(tag.get("name", "")).lower().strip(),
+            str(tag.get("address", "")).upper().strip(),
+        )
+        if tag_id not in existing_ids and tag_key not in existing_keys:
+            tag["name"] = _format_tag_name_with_label(tag["name"], label)
+        processed.append(tag)
+    return processed
 
 
 _S7_PORT = 102  # Standard Siemens S7 TCP port
@@ -369,11 +413,14 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            label = str(user_input.get(CONF_TAG_LABEL, "")).strip()
+            if not label:
+                errors[CONF_TAG_LABEL] = "label_required"
             address = normalize_address(user_input.get("address", ""))
             data_type = user_input.get("data_type", "")
             if not address:
                 errors["address"] = "invalid_address"
-            else:
+            if not errors:
                 try:
                     parsed = parse_address(address, data_type)
                 except ValueError:
@@ -390,7 +437,9 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
                         )
                         tag: dict[str, Any] = {
                             "id": str(uuid.uuid4()),
-                            "name": user_input["name"].strip(),
+                            "name": _format_tag_name_with_label(
+                                user_input["name"], label
+                            ),
                             "address": address,
                             "data_type": parsed["data_type"],
                             "unit": user_input.get("unit", ""),
@@ -401,6 +450,7 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
 
         schema = vol.Schema(
             {
+                vol.Required(CONF_TAG_LABEL): str,
                 vol.Required("name"): str,
                 vol.Required("address"): str,
                 vol.Required("data_type"): vol.In(DATA_TYPES),
@@ -478,6 +528,9 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            label = str(user_input.get(CONF_TAG_LABEL, "")).strip()
+            if not label:
+                errors[CONF_TAG_LABEL] = "label_required"
             raw_yaml = (user_input.get("yaml_content") or "")
             if not raw_yaml.strip():
                 errors["yaml_content"] = "invalid_yaml"
@@ -511,11 +564,15 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
                             break
 
                     if not errors:
-                        self._tags = _merge_tags(self._tags, validated)
+                        formatted = _apply_label_to_new_imported_tags(
+                            self._tags, validated, label
+                        )
+                        self._tags = _merge_tags(self._tags, formatted)
                         return await self.async_step_menu()
 
         schema = vol.Schema(
             {
+                vol.Required(CONF_TAG_LABEL): str,
                 vol.Required("yaml_content"): TextSelector(
                     TextSelectorConfig(multiline=True)
                 ),

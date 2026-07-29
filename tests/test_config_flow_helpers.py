@@ -1,7 +1,18 @@
 """Tests for config_flow helper functions: _validate_and_normalize_tag and _merge_tags."""
+import asyncio
+from types import SimpleNamespace
+
 import pytest
 
-from custom_components.snap7_plc.config_flow import _merge_tags, _validate_and_normalize_tag
+import custom_components.snap7_plc.config_flow as config_flow_module
+from custom_components.snap7_plc.config_flow import (
+    Snap7OptionsFlow,
+    _apply_label_to_new_imported_tags,
+    _format_tag_name_with_label,
+    _merge_tags,
+    _validate_and_normalize_tag,
+)
+from custom_components.snap7_plc.const import CONF_SCAN_INTERVAL
 
 
 # ---------------------------------------------------------------------------
@@ -215,3 +226,123 @@ class TestMergeTags:
         original_name = existing[0]["name"]
         _merge_tags(existing, [self._make_tag("a", "Modified", "M0.0")])
         assert existing[0]["name"] == original_name
+
+
+class TestLabelBasedNaming:
+    def test_missing_label_raises(self):
+        with pytest.raises(ValueError, match="label is required"):
+            _format_tag_name_with_label("Ready to start", "   ")
+
+    def test_formats_plc_prefixed_name(self):
+        assert (
+            _format_tag_name_with_label("PLC 192_168_1_1 Ready to start", "LINE_A")
+            == "[LINE_A].Ready to start"
+        )
+
+    def test_import_applies_label_only_to_new_tags(self):
+        existing = [
+            {
+                "id": "existing-id",
+                "name": "PLC 192_168_1_1 Ready to start",
+                "address": "M0.0",
+                "data_type": "bool",
+                "unit": "",
+                "writable": False,
+            }
+        ]
+        imported = [
+            {
+                "id": "existing-id",
+                "name": "PLC 192_168_1_1 Ready to start",
+                "address": "M0.0",
+                "data_type": "bool",
+                "unit": "",
+                "writable": False,
+            },
+            {
+                "id": "new-id",
+                "name": "PLC 192_168_1_1 Pump Running",
+                "address": "M0.1",
+                "data_type": "bool",
+                "unit": "",
+                "writable": False,
+            },
+        ]
+
+        processed = _apply_label_to_new_imported_tags(existing, imported, "LINE_A")
+        merged = _merge_tags(existing, processed)
+
+        assert merged[0]["name"] == "PLC 192_168_1_1 Ready to start"
+        assert merged[1]["name"] == "[LINE_A].Pump Running"
+
+
+class TestOptionsFlowLabelValidation:
+    @staticmethod
+    def _flow() -> Snap7OptionsFlow:
+        entry = SimpleNamespace(options={}, data={CONF_SCAN_INTERVAL: 30000})
+        flow = Snap7OptionsFlow(entry)
+        config_flow_module.TextSelector = lambda _config=None: str
+        flow.async_show_form = lambda **kwargs: kwargs
+        async def _menu():
+            return {"type": "menu"}
+
+        flow.async_step_menu = _menu
+        return flow
+
+    def test_add_tag_requires_label(self):
+        flow = self._flow()
+        result = asyncio.run(
+            flow.async_step_add_tag(
+                {
+                    "label": " ",
+                    "name": "Ready to start",
+                    "address": "M0.0",
+                    "data_type": "bool",
+                }
+            )
+        )
+        assert result["errors"]["label"] == "label_required"
+        assert flow._tags == []
+
+    def test_import_tags_requires_label(self):
+        flow = self._flow()
+        result = asyncio.run(
+            flow.async_step_import_tags(
+                {
+                    "label": "",
+                    "yaml_content": "- name: Ready to start\n  address: M0.0\n  data_type: bool",
+                }
+            )
+        )
+        assert result["errors"]["label"] == "label_required"
+
+    def test_add_tag_formats_name_with_label(self):
+        flow = self._flow()
+        asyncio.run(
+            flow.async_step_add_tag(
+                {
+                    "label": "LINE_A",
+                    "name": "PLC 192_168_1_1 Ready to start",
+                    "address": "M0.0",
+                    "data_type": "bool",
+                }
+            )
+        )
+        assert flow._tags[0]["name"] == "[LINE_A].Ready to start"
+
+    def test_import_new_tag_formats_name_with_label(self):
+        flow = self._flow()
+        asyncio.run(
+            flow.async_step_import_tags(
+                {
+                    "label": "LINE_A",
+                    "yaml_content": (
+                        "- id: new-id\n"
+                        "  name: PLC 192_168_1_1 Pump Running\n"
+                        "  address: M0.1\n"
+                        "  data_type: bool"
+                    ),
+                }
+            )
+        )
+        assert flow._tags[0]["name"] == "[LINE_A].Pump Running"

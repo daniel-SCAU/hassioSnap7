@@ -16,6 +16,7 @@ CONF_TAG_ADDRESS = "address"
 CONF_TAG_DATA_TYPE = "data_type"
 CONF_TAG_UNIT = "unit"
 CONF_TAG_WRITABLE = "writable"
+CONF_TAG_LABEL = "label"
 
 # Default connection settings
 DEFAULT_RACK = 0

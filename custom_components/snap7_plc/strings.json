@@ -49,8 +49,9 @@
       },
       "add_tag": {
         "title": "Add PLC Tag",
-        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`\n- Raw ASCII bytes (N bytes): `MB140(4)` or `DB1.DBB0(10)`\n\n**Note:** `input_number` always creates a writable Number entity. `int`, `dint`, and `real` tags can also be made writable (Number entity) by checking the Writable box. Only `bool` tags create a Switch entity when writable.",
+        "description": "Add a tag to monitor from the PLC.\n\n**Address formats:**\n- Boolean (1 bit): `M0.0` or `DB1.DBX0.0`\n- Byte (8 bit): `MB0` or `DB1.DBB0`\n- Word / Int (16 bit): `MW0` or `DB1.DBW0`\n- DWord / DInt / Real (32 bit): `MD0` or `DB1.DBD0`\n- Raw ASCII bytes (N bytes): `MB140(4)` or `DB1.DBB0(10)`\n\n**Note:** `input_number` always creates a writable Number entity. `int`, `dint`, and `real` tags can also be made writable (Number entity) by checking the Writable box. Only `bool` tags create a Switch entity when writable.\n\nTag names for new tags are saved as `[LABEL].<name suffix>`.",
         "data": {
+          "label": "Label (required)",
           "name": "Tag Name",
           "address": "PLC Address",
           "data_type": "Data Type",
@@ -71,8 +72,9 @@
       },
       "import_tags": {
         "title": "Import Tags (YAML)",
-        "description": "Paste a YAML tag list to merge into your existing tags.\n\nAccepted formats:\n- A top-level list of tag objects.\n- A mapping with a `tags:` key containing the list.\n\nImported tags are **merged** — matched by `id` or by `(name, address)`. Existing tags not referenced by the import are kept unchanged.",
+        "description": "Paste a YAML tag list to merge into your existing tags.\n\nAccepted formats:\n- A top-level list of tag objects.\n- A mapping with a `tags:` key containing the list.\n\nImported tags are **merged** — matched by `id` or by `(name, address)`. Existing tags not referenced by the import are kept unchanged.\n\nOnly newly imported tags are renamed to `[LABEL].<name suffix>`.",
         "data": {
+          "label": "Label (required)",
           "yaml_content": "YAML Content"
         }
       },
@@ -89,7 +91,8 @@
       "only_numeric_writable": "Only bool, int, dint, real, and input_number tags can be marked as Writable. Remove the Writable flag or choose a supported data type.",
       "invalid_yaml": "Could not parse YAML. Please check the syntax and try again.",
       "invalid_yaml_structure": "Unexpected YAML structure. Provide either a top-level list or a mapping with a 'tags' key.",
-      "yaml_tag_validation_error": "One or more tags failed validation. Check that each tag has a valid 'name', 'address', and 'data_type'."
+      "yaml_tag_validation_error": "One or more tags failed validation. Check that each tag has a valid 'name', 'address', and 'data_type'.",
+      "label_required": "Label is required."
     }
   }
 }
