@@ -1,6 +1,7 @@
 {
   "name": "Snap7 PLC",
   "render_readme": true,
-  "domains": ["sensor", "binary_sensor", "switch"],
+  "domains": ["sensor", "binary_sensor", "switch", "number"],
+  "country": ["DE"],
   "homeassistant": "2024.1.0"
 }
