@@ -15,6 +15,8 @@ from custom_components.snap7_plc.config_flow import (
 )
 from custom_components.snap7_plc.const import CONF_SCAN_INTERVAL
 
+DEFAULT_TEST_SCAN_INTERVAL = 30000
+
 
 # ---------------------------------------------------------------------------
 # _validate_and_normalize_tag
@@ -280,7 +282,9 @@ class TestLabelBasedNaming:
 class TestOptionsFlowLabelValidation:
     @staticmethod
     def _flow(monkeypatch) -> Snap7OptionsFlow:
-        entry = SimpleNamespace(options={}, data={CONF_SCAN_INTERVAL: 30000})
+        entry = SimpleNamespace(
+            options={}, data={CONF_SCAN_INTERVAL: DEFAULT_TEST_SCAN_INTERVAL}
+        )
         flow = Snap7OptionsFlow(entry)
         monkeypatch.setattr(config_flow_module, "TextSelector", lambda _config=None: str)
         flow.async_show_form = lambda **kwargs: kwargs

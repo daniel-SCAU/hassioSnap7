@@ -416,14 +416,15 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             address = normalize_address(user_input.get("address", ""))
             data_type = user_input.get("data_type", "")
-            parsed: dict[str, Any] | None = None
             if not address:
                 errors["address"] = "invalid_address"
+                parsed = None
             else:
                 try:
                     parsed = parse_address(address, data_type)
                 except ValueError:
                     errors["address"] = "invalid_address"
+                    parsed = None
 
             label = str(user_input.get(CONF_TAG_LABEL, "")).strip()
             if not label:
