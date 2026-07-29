@@ -167,7 +167,7 @@ def _format_tag_name_with_label(name: str, label: str) -> str:
     """Return name formatted as ``[LABEL].suffix``."""
     clean_label = str(label).strip()
     if not clean_label:
-        raise ValueError("Tag label is required and must not be empty")
+        raise ValueError("label is required and must not be empty")
 
     original_name = str(name).strip()
     if not original_name:

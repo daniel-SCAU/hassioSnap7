@@ -1,6 +1,7 @@
 """Tests for config_flow helper functions: _validate_and_normalize_tag and _merge_tags."""
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -278,19 +279,16 @@ class TestLabelBasedNaming:
 
 class TestOptionsFlowLabelValidation:
     @staticmethod
-    def _flow() -> Snap7OptionsFlow:
+    def _flow(monkeypatch) -> Snap7OptionsFlow:
         entry = SimpleNamespace(options={}, data={CONF_SCAN_INTERVAL: 30000})
         flow = Snap7OptionsFlow(entry)
-        config_flow_module.TextSelector = lambda _config=None: str
+        monkeypatch.setattr(config_flow_module, "TextSelector", lambda _config=None: str)
         flow.async_show_form = lambda **kwargs: kwargs
-        async def _menu():
-            return {"type": "menu"}
-
-        flow.async_step_menu = _menu
+        flow.async_step_menu = AsyncMock(return_value={"type": "menu"})
         return flow
 
-    def test_add_tag_requires_label(self):
-        flow = self._flow()
+    def test_add_tag_requires_label(self, monkeypatch):
+        flow = self._flow(monkeypatch)
         result = asyncio.run(
             flow.async_step_add_tag(
                 {
@@ -304,8 +302,8 @@ class TestOptionsFlowLabelValidation:
         assert result["errors"]["label"] == "label_required"
         assert flow._tags == []
 
-    def test_import_tags_requires_label(self):
-        flow = self._flow()
+    def test_import_tags_requires_label(self, monkeypatch):
+        flow = self._flow(monkeypatch)
         result = asyncio.run(
             flow.async_step_import_tags(
                 {
@@ -316,8 +314,8 @@ class TestOptionsFlowLabelValidation:
         )
         assert result["errors"]["label"] == "label_required"
 
-    def test_add_tag_formats_name_with_label(self):
-        flow = self._flow()
+    def test_add_tag_formats_name_with_label(self, monkeypatch):
+        flow = self._flow(monkeypatch)
         asyncio.run(
             flow.async_step_add_tag(
                 {
@@ -330,8 +328,8 @@ class TestOptionsFlowLabelValidation:
         )
         assert flow._tags[0]["name"] == "[LINE_A].Ready to start"
 
-    def test_import_new_tag_formats_name_with_label(self):
-        flow = self._flow()
+    def test_import_new_tag_formats_name_with_label(self, monkeypatch):
+        flow = self._flow(monkeypatch)
         asyncio.run(
             flow.async_step_import_tags(
                 {
