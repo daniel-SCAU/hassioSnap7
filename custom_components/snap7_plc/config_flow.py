@@ -173,6 +173,7 @@ def _format_tag_name_with_label(name: str, label: str) -> str:
     if not original_name:
         return f"[{clean_label}]."
 
+    # Remove legacy prefix pattern like "PLC 192_168_1_1 " from old tag names.
     suffix = re.sub(r"^PLC\s+\S+\s+", "", original_name)
     suffix = suffix.strip() or original_name
     return f"[{clean_label}].{suffix}"
@@ -418,6 +419,7 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
                 errors[CONF_TAG_LABEL] = "label_required"
             address = normalize_address(user_input.get("address", ""))
             data_type = user_input.get("data_type", "")
+            # Set only when parse_address succeeds for a valid address.
             parsed: dict[str, Any] | None = None
             if not address:
                 errors["address"] = "invalid_address"
