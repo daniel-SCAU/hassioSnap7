@@ -127,5 +127,5 @@ Go to **Settings → Devices & Services → Snap7 PLC → ⋮ → Reconfigure** 
 ## Requirements
 
 - Home Assistant 2024.1 or newer
-- `python-snap7==1.3` (installed automatically)
+- `python-snap7>=3.0,<4.0` (installed automatically)
 - The PLC must have Ethernet access enabled (S7COMM or S7COMM+)
