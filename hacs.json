@@ -1,6 +1,7 @@
 {
   "name": "Snap7 PLC",
   "render_readme": true,
+  "content_in_root": false,
   "domains": ["snap7_plc"],
   "country": ["DK"],
   "homeassistant": "2024.1.0"

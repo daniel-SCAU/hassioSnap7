@@ -1,10 +1,12 @@
 {
   "domain": "snap7_plc",
   "name": "Snap7 PLC",
-  "documentation": "https://github.com/daniel-SCAU/hassioSnap7",
+  "documentation": "https://github.com/daniel-SCAU/hassioSnap7#readme",
+  "issue_tracker": "https://github.com/daniel-SCAU/hassioSnap7/issues",
   "requirements": ["python-snap7>=3.0,<4.0"],
-  "codeowners": [],
+  "codeowners": ["@daniel-SCAU"],
   "config_flow": true,
+  "integration_type": "hub",
   "iot_class": "local_polling",
   "version": "1.0.12"
 }
