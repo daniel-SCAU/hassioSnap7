@@ -419,7 +419,6 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
                 errors[CONF_TAG_LABEL] = "label_required"
             address = normalize_address(user_input.get("address", ""))
             data_type = user_input.get("data_type", "")
-            # Set only when parse_address succeeds for a valid address.
             parsed: dict[str, Any] | None = None
             if not address:
                 errors["address"] = "invalid_address"
@@ -431,25 +430,25 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
             if not errors and parsed is not None:
                 if user_input.get("writable") and parsed["data_type"] not in _WRITABLE_TYPES:
                     errors["writable"] = "only_numeric_writable"
-                else:
-                    # input_number is always writable regardless of the checkbox
-                    is_writable = (
-                        True
-                        if parsed["data_type"] == DATA_TYPE_INPUT_NUMBER
-                        else user_input.get("writable", False)
-                    )
-                    tag: dict[str, Any] = {
-                        "id": str(uuid.uuid4()),
-                        "name": _format_tag_name_with_label(
-                            user_input["name"], label
-                        ),
-                        "address": address,
-                        "data_type": parsed["data_type"],
-                        "unit": user_input.get("unit", ""),
-                        "writable": is_writable,
-                    }
-                    self._tags.append(tag)
-                    return await self.async_step_menu()
+            if not errors and parsed is not None:
+                # input_number is always writable regardless of the checkbox
+                is_writable = (
+                    True
+                    if parsed["data_type"] == DATA_TYPE_INPUT_NUMBER
+                    else user_input.get("writable", False)
+                )
+                tag: dict[str, Any] = {
+                    "id": str(uuid.uuid4()),
+                    "name": _format_tag_name_with_label(
+                        user_input["name"], label
+                    ),
+                    "address": address,
+                    "data_type": parsed["data_type"],
+                    "unit": user_input.get("unit", ""),
+                    "writable": is_writable,
+                }
+                self._tags.append(tag)
+                return await self.async_step_menu()
 
         schema = vol.Schema(
             {
