@@ -171,7 +171,7 @@ def _format_tag_name_with_label(name: str, label: str) -> str:
 
     original_name = str(name).strip()
     if not original_name:
-        return f"[{clean_label}]."
+        raise ValueError("name is required and must not be empty")
 
     # Remove legacy prefix pattern like "PLC 192_168_1_1 " from old tag names.
     suffix = re.sub(r"^PLC\s+\S+\s+", "", original_name)
@@ -416,19 +416,20 @@ class Snap7OptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             address = normalize_address(user_input.get("address", ""))
             data_type = user_input.get("data_type", "")
+            parsed: dict[str, Any] | None = None
             if not address:
                 errors["address"] = "invalid_address"
-                parsed = None
             else:
                 try:
                     parsed = parse_address(address, data_type)
                 except ValueError:
                     errors["address"] = "invalid_address"
-                    parsed = None
 
             label = str(user_input.get(CONF_TAG_LABEL, "")).strip()
             if not label:
                 errors[CONF_TAG_LABEL] = "label_required"
+            if not str(user_input.get("name", "")).strip():
+                errors["name"] = "required"
 
             if not errors and parsed is not None:
                 if user_input.get("writable") and parsed["data_type"] not in _WRITABLE_TYPES:
