@@ -173,8 +173,9 @@ def _format_tag_name_with_label(name: str, label: str) -> str:
     if not original_name:
         raise ValueError("name is required and must not be empty")
 
-    # Remove legacy prefix pattern like "PLC 192_168_1_1 " from old tag names.
-    suffix = re.sub(r"^PLC\s+\S+\s+", "", original_name)
+    # Remove any existing "[...]." prefix and legacy "PLC <host> " prefix from old tag names.
+    suffix = re.sub(r"^\[[^\]]+\]\.", "", original_name)
+    suffix = re.sub(r"^PLC\s+\S+\s+", "", suffix)
     suffix = suffix.strip() or original_name
     return f"[{clean_label}].{suffix}"
 
